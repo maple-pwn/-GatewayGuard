@@ -46,12 +46,14 @@ class RuleBasedDetector:
             return alerts
 
         id_counts = Counter(p.msg_id for p in packets if p.protocol == "CAN")
-        avg_freq = len(packets) / time_span
+        if not id_counts:
+            return alerts
+        avg_per_id_freq = sum(id_counts.values()) / len(id_counts) / time_span
 
         for msg_id, count in id_counts.items():
             freq = count / time_span
-            if freq > avg_freq * self.freq_threshold:
-                ratio = freq / (avg_freq * self.freq_threshold)
+            if freq > avg_per_id_freq * self.freq_threshold:
+                ratio = freq / (avg_per_id_freq * self.freq_threshold)
                 if ratio > 3.0:
                     severity = "critical"
                 elif ratio > 1.5:
@@ -66,7 +68,7 @@ class RuleBasedDetector:
                     protocol="CAN",
                     source_node=msg_id,
                     description=f"报文 {msg_id} 频率异常: {freq:.1f} pkt/s, "
-                                f"均值 {avg_freq:.1f} pkt/s, "
+                                f"每ID均值 {avg_per_id_freq:.1f} pkt/s, "
                                 f"超出阈值 {self.freq_threshold}x",
                     detection_method="rule_frequency",
                 ))
