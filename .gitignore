@@ -36,6 +36,40 @@ compare_prev_logic.json
 # OMC
 .omc/
 opencode.json
+.codex/
 
 # Datasets (large binary files)
 datasets/
+
+# Editor / IDE
+.idea/
+.vscode/
+
+# Frontend local cache
+frontend/.vite/
+
+# Android / Gradle local artifacts
+.gradle/
+.gradle-user-home/
+**/.gradle/
+**/.gradle-user-home/
+**/.kotlin/
+**/build/
+*.apk
+*.aab
+*.jks
+local.properties
+
+# Bundled Android tool archives / local SDK helpers
+Another Android Gateway Guard/tools/
+Another Android Gateway Guard/tools/*.zip
+Another Android Gateway Guard/android-app/local.properties
+Another Android Gateway Guard/android-app/keystore/
+
+# Local media / design assets not required for runtime
+assets/
+asset/
+images/
+image/
+img/
+素材/

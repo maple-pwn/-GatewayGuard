@@ -1,53 +1,40 @@
 <template>
-  <div class="anomaly-page">
-    <section class="section-block anomaly-overview">
+  <div class="events-page">
+    <section class="section-block">
       <el-row :gutter="18">
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
             <div class="metric-card__label">事件总量</div>
             <div class="metric-card__value">{{ total }}</div>
-            <div class="metric-card__meta">当前筛选条件下的异常事件数量</div>
-            <div class="metric-card__accent">Incident Volume</div>
+            <div class="metric-card__meta">当前筛选条件下的异常事件总数</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
             <div class="metric-card__label">高危与严重</div>
             <div class="metric-card__value">{{ highRiskCount }}</div>
-            <div class="metric-card__meta">需要优先处置的核心事件集合</div>
-            <div class="metric-card__accent">Priority Queue</div>
+            <div class="metric-card__meta">需要优先处理的核心风险事件</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
             <div class="metric-card__label">处理中</div>
             <div class="metric-card__value">{{ openCount }}</div>
-            <div class="metric-card__meta">待处理与调查中的告警状态</div>
-            <div class="metric-card__accent">Investigation</div>
+            <div class="metric-card__meta">待处理或调查中的异常状态</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
             <div class="metric-card__label">AI 可研判</div>
             <div class="metric-card__value">{{ Math.min(events.length, 5) }}</div>
-            <div class="metric-card__meta">支持批量分析的事件窗口</div>
-            <div class="metric-card__accent">LLM Ready</div>
+            <div class="metric-card__meta">当前页支持批量分析的事件窗口</div>
           </el-card>
         </el-col>
       </el-row>
     </section>
 
-    <section class="section-block anomaly-layout">
-      <el-card class="panel-card filter-panel">
-        <template #header>
-          <div class="panel-header">
-            <div>
-              <div class="panel-header__title">事件筛选与检索</div>
-              <div class="panel-header__desc">按严重程度与状态快速切换当前研判视图。</div>
-            </div>
-          </div>
-        </template>
-
+    <section class="section-block events-grid">
+      <el-card class="panel-card">
         <div class="filter-grid">
           <div class="filter-field">
             <label>严重程度</label>
@@ -67,34 +54,35 @@
             </el-select>
           </div>
           <div class="filter-action">
-            <el-button type="primary" @click="loadEvents">查询事件</el-button>
+            <el-button type="primary" class="ai-action-btn ai-action-btn--query" @click="loadEvents">
+              查询事件
+            </el-button>
           </div>
         </div>
       </el-card>
 
-      <el-card class="panel-card panel-card--dark ai-panel">
-        <div class="ai-panel__eyebrow">AI Intelligence</div>
-        <h3>让事件中心拥有自动摘要与预警报告</h3>
-        <p>把 AI 分析按钮做成一级可见操作，而不是藏在表格里。</p>
+      <el-card class="panel-card panel-card--dark">
+        <div class="ai-box__eyebrow">AI Intelligence</div>
+        <h3>生成摘要、报告和批量语义分析</h3>
 
-        <div class="ai-panel__actions">
+        <div class="ai-box__actions">
           <el-button
-            class="ai-panel__action-btn"
             type="warning"
             size="large"
+            class="ai-action-btn ai-action-btn--report"
             @click="generateReport"
             :loading="reportLoading"
           >
             生成 AI 预警报告
           </el-button>
           <el-button
-            class="ai-panel__action-btn"
             type="danger"
             size="large"
+            class="ai-action-btn ai-action-btn--batch"
             @click="batchAnalyze"
             :loading="batchLoading"
           >
-            批量 AI 分析异常事件
+            批量 AI 分析
           </el-button>
         </div>
       </el-card>
@@ -104,12 +92,12 @@
       <div class="section-head">
         <div>
           <div class="section-head__title">异常事件列表</div>
-          <div class="section-head__desc">当前共 {{ total }} 条事件，表格保留原始数据字段与 AI 分析入口。</div>
+          <div class="section-head__desc">保留原始数据字段与逐条 AI 分析能力。</div>
         </div>
       </div>
 
       <el-card class="panel-card table-card">
-        <el-table :data="events" stripe style="width: 100%">
+        <el-table :data="events" stripe style="width: 100%" max-height="560">
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column prop="anomaly_type" label="类型" width="180" />
           <el-table-column label="严重程度" width="110">
@@ -339,7 +327,7 @@ async function analyzeEvent(row) {
   try {
     const res = await llmApi.analyze(row.id)
     analysisResult.value = res.data.analysis
-  } catch (e) {
+  } catch {
     ElMessage.error('LLM 分析失败，请检查 API Key 配置')
   } finally {
     analysisLoading.value = false
@@ -353,7 +341,7 @@ async function generateReport() {
   try {
     const res = await llmApi.report(10)
     reportResult.value = res.data.report
-  } catch (e) {
+  } catch {
     ElMessage.error('报告生成失败')
     showReport.value = false
   } finally {
@@ -385,10 +373,22 @@ onMounted(loadEvents)
 </script>
 
 <style scoped>
-.anomaly-layout {
+.events-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-  gap: 22px;
+  gap: 18px;
+}
+
+.panel-header__title {
+  color: var(--gg-text-strong);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.panel-header__desc {
+  margin-top: 6px;
+  color: var(--gg-text-soft);
+  font-size: 13px;
 }
 
 .filter-grid {
@@ -409,37 +409,20 @@ onMounted(loadEvents)
   font-size: 13px;
 }
 
-.ai-panel__eyebrow {
-  color: rgba(147, 202, 248, 0.86);
+.ai-box__eyebrow {
+  color: #9fb6dd;
   font-size: 12px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-.ai-panel h3 {
-  margin: 12px 0 10px;
-  font-size: 28px;
-  font-family: var(--gg-font-display);
-}
-
-.ai-panel p {
-  margin: 0;
-  color: rgba(220, 232, 248, 0.8);
-  line-height: 1.7;
-}
-
-.ai-panel__actions {
+.ai-box__actions {
   display: grid;
   gap: 12px;
   margin-top: 22px;
 }
 
-.ai-panel__action-btn {
-  width: 100%;
-  min-height: 40px;
-}
-
-.ai-panel__actions :deep(.el-button + .el-button) {
+.ai-box__actions :deep(.el-button + .el-button) {
   margin-left: 0;
 }
 
@@ -520,7 +503,7 @@ onMounted(loadEvents)
 }
 
 @media (max-width: 1080px) {
-  .anomaly-layout,
+  .events-grid,
   .filter-grid {
     grid-template-columns: 1fr;
   }

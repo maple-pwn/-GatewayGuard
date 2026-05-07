@@ -1,72 +1,93 @@
 <template>
-  <div class="dashboard-page">
+  <div class="console-page">
     <section class="section-block">
-      <div class="section-head">
-        <div>
-          <div class="section-head__title">监测总览</div>
-          <div class="section-head__desc">
-            按协议域拆解当前报文规模、采集状态与攻击演练入口。
-          </div>
-        </div>
-      </div>
-
       <el-row :gutter="18">
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
             <div class="metric-card__label">总报文数</div>
             <div class="metric-card__value">{{ stats.total_packets }}</div>
-            <div class="metric-card__meta">当前数据库中的全量采集记录</div>
-            <div class="metric-card__accent">Telemetry Archive</div>
+            <div class="metric-card__meta">数据库中累计采集的全量流量记录</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
-            <div class="metric-card__label">CAN 报文</div>
-            <div class="metric-card__value">{{ stats.can_count }}</div>
-            <div class="metric-card__meta">关键控制域与网关通信主链路</div>
-            <div class="metric-card__accent">Bus Priority</div>
+            <div class="metric-card__label">CAN / ETH / V2X</div>
+            <div class="metric-card__value">{{ stats.can_count }}/{{ stats.eth_count }}/{{ stats.v2x_count }}</div>
+            <div class="metric-card__meta">三类协议域的当前累计规模</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
-            <div class="metric-card__label">以太网报文</div>
-            <div class="metric-card__value">{{ stats.eth_count }}</div>
-            <div class="metric-card__meta">车载以太网与服务化通信数据</div>
-            <div class="metric-card__accent">Service Network</div>
+            <div class="metric-card__label">实时采集</div>
+            <div class="metric-card__value">{{ collectStatus.running ? '运行中' : '未运行' }}</div>
+            <div class="metric-card__meta">当前采集器状态与 WebSocket 联动展示</div>
           </el-card>
         </el-col>
         <el-col :xs="24" :sm="12" :xl="6">
           <el-card class="portal-card metric-card">
-            <div class="metric-card__label">V2X 报文</div>
-            <div class="metric-card__value">{{ stats.v2x_count }}</div>
-            <div class="metric-card__meta">外部协同通信与道路侧交互流量</div>
-            <div class="metric-card__accent">Road Intelligence</div>
+            <div class="metric-card__label">训练状态</div>
+            <div class="metric-card__value">{{ trainingStatus.trained ? '已训练' : '未训练' }}</div>
+            <div class="metric-card__meta">异常检测是否具备可执行的基线模型</div>
           </el-card>
         </el-col>
       </el-row>
     </section>
 
-    <section class="section-block dashboard-grid">
-      <el-card class="panel-card control-panel">
-        <template #header>
-          <div class="panel-header">
-            <div>
-              <div class="panel-header__title">实时采集控制台</div>
-              <div class="panel-header__desc">统一管理在线采集模式、导入任务与 WebSocket 链路状态。</div>
-            </div>
-            <div class="status-line">
-              <el-tag :type="wsStateTag" effect="plain">{{ wsStateLabel }}</el-tag>
-              <el-tag :type="collectStatus.running ? 'success' : 'info'" effect="dark">
-                {{ collectStatus.running ? '采集中' : '已停止' }}
-              </el-tag>
-            </div>
-          </div>
-        </template>
+    <section class="section-block console-grid">
+      <el-card class="panel-card">
+        <div class="console-head">
+          <div class="panel-header__title">运行控制</div>
+          <el-tag :type="wsStateTag" effect="plain">{{ wsStateLabel }}</el-tag>
+        </div>
 
-        <div class="control-layout">
-          <div class="control-form">
-            <div class="control-field">
-              <label>数据源模式</label>
+        <div class="console-cards">
+          <div class="console-card">
+            <div class="console-card__title">模拟流量</div>
+            <div class="console-row">
+              <el-select v-model="scenario">
+                <el-option label="正常流量" value="normal" />
+                <el-option label="DoS 攻击" value="dos" />
+                <el-option label="Fuzzy 攻击" value="fuzzy" />
+                <el-option label="Spoofing 攻击" value="spoofing" />
+                <el-option label="混合场景" value="mixed" />
+              </el-select>
+            </div>
+            <el-button
+              type="primary"
+              class="console-action-btn console-action-btn--simulate"
+              @click="simulateTraffic"
+              :loading="simLoading"
+            >
+              生成模拟流量
+            </el-button>
+          </div>
+
+          <div class="console-card">
+            <div class="console-card__title">检测器</div>
+            <div class="console-actions">
+              <el-button
+                type="warning"
+                class="console-action-btn console-action-btn--train"
+                @click="trainDetector()"
+                :loading="trainingLoading"
+              >
+                训练检测器
+              </el-button>
+              <el-button
+                type="danger"
+                class="console-action-btn console-action-btn--detect"
+                @click="runDetection"
+                :loading="detectLoading"
+              >
+                执行异常检测
+              </el-button>
+            </div>
+            <div class="console-hint">建议先在“正常流量”场景下完成基线训练。</div>
+          </div>
+
+          <div class="console-card">
+            <div class="console-card__title">实时流量</div>
+            <div class="console-row">
               <el-select v-model="sourceMode" :disabled="collectStatus.running">
                 <el-option label="模拟器" value="simulator" />
                 <el-option label="CAN 总线" value="can" />
@@ -75,10 +96,10 @@
                 <el-option label="多源混合" value="multi" />
               </el-select>
             </div>
-
-            <div class="control-actions">
+            <div class="console-actions">
               <el-button
                 type="success"
+                class="console-action-btn console-action-btn--collect"
                 @click="startCollect"
                 :loading="collectLoading"
                 :disabled="collectStatus.running"
@@ -86,74 +107,32 @@
                 启动采集
               </el-button>
               <el-button
-                type="danger"
                 @click="stopCollect"
                 :loading="collectLoading"
                 :disabled="!collectStatus.running"
               >
                 停止采集
               </el-button>
-              <el-button type="warning" plain @click="showImportDialog = true">
-                导入抓包文件
-              </el-button>
-            </div>
-          </div>
-
-          <div class="signal-board">
-            <div class="signal-board__item">
-              <span>已采集</span>
-              <strong>{{ collectStatus.total_collected || 0 }}</strong>
-            </div>
-            <div class="signal-board__item">
-              <span>异常数</span>
-              <strong>{{ collectStatus.total_anomalies || 0 }}</strong>
-            </div>
-            <div class="signal-board__item">
-              <span>当前模式</span>
-              <strong>{{ sourceMode.toUpperCase() }}</strong>
             </div>
           </div>
         </div>
-      </el-card>
 
-      <el-card class="panel-card panel-card--dark scenario-panel">
-        <div class="scenario-panel__eyebrow">Threat Simulation</div>
-        <h3>攻击演练与检测触发</h3>
-        <p>以补天式门户首页的“核心能力入口”逻辑组织模拟、检测和清理动作，让关键操作集中可见。</p>
-
-        <div class="scenario-field">
-          <label>演练场景</label>
-          <el-select v-model="scenario">
-            <el-option label="正常流量" value="normal" />
-            <el-option label="DoS 攻击" value="dos" />
-            <el-option label="Fuzzy 攻击" value="fuzzy" />
-            <el-option label="Spoofing 攻击" value="spoofing" />
-            <el-option label="混合场景" value="mixed" />
-          </el-select>
+        <div class="console-summary">
+          <div class="summary-box">
+            <span>当前模式</span>
+            <strong>{{ sourceMode.toUpperCase() }}</strong>
+          </div>
+          <div class="summary-box">
+            <span>已采集</span>
+            <strong>{{ collectStatus.total_collected || 0 }}</strong>
+          </div>
+          <div class="summary-box">
+            <span>异常数</span>
+            <strong>{{ collectStatus.total_anomalies || 0 }}</strong>
+          </div>
         </div>
 
-        <div class="scenario-status">
-          <el-tag :type="trainingStateTag" effect="dark">
-            {{ trainingStatus.trained ? '检测器已训练' : '检测器未训练' }}
-          </el-tag>
-          <span class="scenario-status__text">
-            建议先生成正常流量并训练，再执行攻击检测。
-          </span>
-        </div>
-
-        <div class="scenario-actions">
-          <el-button type="primary" @click="simulateTraffic" :loading="simLoading">
-            生成模拟流量
-          </el-button>
-          <el-button type="warning" @click="trainDetector()" :loading="trainingLoading">
-            训练检测器
-          </el-button>
-          <el-button type="danger" @click="runDetection" :loading="detectLoading">
-            执行异常检测
-          </el-button>
-        </div>
-
-        <div v-if="trainingResult" class="scenario-result">
+        <div v-if="trainingResult" class="console-result">
           <el-alert
             :title="trainingResult.message"
             :type="trainingResult.trained ? 'success' : 'warning'"
@@ -162,7 +141,7 @@
           />
         </div>
 
-        <div v-if="detectResult" class="scenario-result">
+        <div v-if="detectResult" class="console-result">
           <el-alert
             :title="`检测完成，发现 ${detectResult.detected} 个异常`"
             :type="detectResult.detected > 0 ? 'warning' : 'success'"
@@ -170,90 +149,121 @@
             :closable="false"
           />
         </div>
-
-        <div class="scenario-clean">
-          <el-dropdown split-button type="info" plain @click="clearData">
-            清空全部数据
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="showPartialClean = true">按条件清理</el-dropdown-item>
-                <el-dropdown-item @click="keepRecent(500)">仅保留最近 500 条</el-dropdown-item>
-                <el-dropdown-item @click="keepRecent(100)">仅保留最近 100 条</el-dropdown-item>
-                <el-dropdown-item divided @click="clearByProtocol('CAN')">删除所有 CAN 报文</el-dropdown-item>
-                <el-dropdown-item @click="clearByProtocol('ETH')">删除所有 ETH 报文</el-dropdown-item>
-                <el-dropdown-item @click="clearByProtocol('V2X')">删除所有 V2X 报文</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
       </el-card>
-    </section>
 
-    <section class="section-block">
-      <div class="section-head">
-        <div>
-          <div class="section-head__title">实时告警流</div>
-          <div class="section-head__desc">以时间线方式呈现最近告警，适合安全运营场景快速浏览。</div>
-        </div>
-        <el-button text @click="realtimeAlerts = []" :disabled="!realtimeAlerts.length">清空记录</el-button>
-      </div>
+      <el-card class="panel-card">
+        <template #header>
+          <div class="panel-header">
+            <div>
+              <div class="panel-header__title">数据维护</div>
+            </div>
+          </div>
+        </template>
 
-      <el-card class="panel-card alert-card">
-        <div v-if="realtimeAlerts.length" class="alert-stream">
-          <div v-for="(alert, idx) in realtimeAlerts" :key="idx" class="alert-item">
-            <div class="alert-item__marker" :class="`severity-${alert.severity}`" />
-            <div class="alert-item__body">
-              <div class="alert-item__meta">
-                <el-tag :type="severityColor(alert.severity)" size="small">{{ alert.severity }}</el-tag>
-                <span>{{ new Date(alert.timestamp * 1000).toLocaleTimeString() }}</span>
-              </div>
-              <div class="alert-item__text">{{ alert.description }}</div>
+        <div class="maintenance-stack">
+          <div class="maintenance-item">
+            <div class="maintenance-item__title">导入抓包文件</div>
+            <div class="maintenance-item__desc">支持服务器上已有的 `pcap / pcapng / blf / asc` 文件。</div>
+            <el-button
+              type="primary"
+              plain
+              class="console-action-btn console-action-btn--import"
+              @click="showImportDialog = true"
+            >
+              打开导入面板
+            </el-button>
+          </div>
+
+          <div class="maintenance-item">
+            <div class="maintenance-item__title">按条件清理</div>
+            <div class="maintenance-item__desc">可按协议、严重程度或保留最近 N 条记录做细粒度清理。</div>
+            <el-button
+              type="warning"
+              plain
+              class="console-action-btn console-action-btn--partial-clean"
+              @click="showPartialClean = true"
+            >
+              按条件清理
+            </el-button>
+          </div>
+
+          <div class="maintenance-item">
+            <div class="maintenance-item__title">快速清理</div>
+            <div class="maintenance-actions">
+              <el-button @click="keepRecent(500)">保留最近 500 条</el-button>
+              <el-button @click="clearByProtocol('CAN')">删除 CAN</el-button>
+              <el-button
+                type="danger"
+                class="console-action-btn console-action-btn--clear-all"
+                @click="clearData"
+                :loading="clearLoading"
+              >
+                清空全部数据
+              </el-button>
             </div>
           </div>
         </div>
-        <el-empty v-else description="当前没有新的实时告警" />
       </el-card>
     </section>
 
-    <section class="section-block">
-      <div class="section-head">
-        <div>
-          <div class="section-head__title">最近流量记录</div>
-          <div class="section-head__desc">
-            最近 50 条记录中有 {{ visibleAttackCount }} 条为模拟攻击流量，便于演示时快速确认注入结果。
+    <section class="section-block alert-grid">
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="section-head__title">实时告警流</div>
+            <div class="section-head__desc">保留 WebSocket 驱动的异常推送，作为控制台下方的动态结果区。</div>
           </div>
+          <el-button text @click="realtimeAlerts = []" :disabled="!realtimeAlerts.length">清空</el-button>
         </div>
+
+        <el-card class="panel-card alert-card">
+          <div v-if="realtimeAlerts.length" class="alert-stream">
+            <div v-for="(alert, idx) in realtimeAlerts" :key="idx" class="alert-item">
+              <div class="alert-item__marker" :class="`severity-${alert.severity}`" />
+              <div class="alert-item__body">
+                <div class="alert-item__meta">
+                  <el-tag :type="severityColor(alert.severity)" size="small">{{ alert.severity }}</el-tag>
+                  <span>{{ new Date(alert.timestamp * 1000).toLocaleTimeString() }}</span>
+                </div>
+                <div class="alert-item__text">{{ alert.description }}</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="当前没有新的实时告警" />
+        </el-card>
       </div>
 
-      <el-card class="panel-card table-card">
-        <el-table :data="packets" stripe style="width: 100%" max-height="460">
-          <el-table-column prop="protocol" label="协议" width="90" />
-          <el-table-column label="类型" width="140">
-            <template #default="{ row }">
-              <el-tag :type="row.is_attack ? 'danger' : 'success'" effect="dark">
-                {{ attackLabel(row) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="source" label="源节点" width="140" />
-          <el-table-column prop="destination" label="目标节点" width="140" />
-          <el-table-column prop="msg_id" label="消息 ID" width="140" />
-          <el-table-column prop="domain" label="功能域" width="120" />
-          <el-table-column label="时间" width="200">
-            <template #default="{ row }">
-              {{ new Date(row.timestamp * 1000).toLocaleString() }}
-            </template>
-          </el-table-column>
-          <el-table-column label="状态概览" min-width="200">
-            <template #default="{ row }">
-              <span class="packet-summary">
-                {{ row.protocol }} / {{ row.domain || 'unknown' }} / {{ row.source || '-' }}
-                <template v-if="row.attack_type"> / {{ row.attack_type }}</template>
-              </span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
+      <div>
+        <div class="section-head">
+          <div>
+            <div class="section-head__title">最近流量记录</div>
+            <div class="section-head__desc">
+              最近 50 条记录中有 {{ visibleAttackCount }} 条为模拟攻击流量。
+            </div>
+          </div>
+        </div>
+
+        <el-card class="panel-card table-card">
+          <el-table :data="packets" stripe style="width: 100%" max-height="520">
+            <el-table-column prop="protocol" label="协议" width="90" />
+            <el-table-column label="类型" width="120">
+              <template #default="{ row }">
+                <el-tag :type="row.is_attack ? 'danger' : 'success'" effect="dark">
+                  {{ attackLabel(row) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="source" label="源节点" width="130" />
+            <el-table-column prop="destination" label="目标节点" width="130" />
+            <el-table-column prop="msg_id" label="消息 ID" width="120" />
+            <el-table-column label="时间" width="190">
+              <template #default="{ row }">
+                {{ new Date(row.timestamp * 1000).toLocaleString() }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
     </section>
 
     <el-dialog v-model="showPartialClean" title="按条件清理数据" width="480px">
@@ -368,10 +378,6 @@ const trainingStatus = ref({
   min_train_packets: 10,
 })
 
-const trainingStateTag = computed(() => (
-  trainingStatus.value.trained ? 'success' : 'warning'
-))
-
 function severityColor(s) {
   return { critical: 'danger', high: 'warning', medium: '', low: 'info' }[s] || 'info'
 }
@@ -446,7 +452,7 @@ async function simulateTraffic() {
       }
     }
     await loadData()
-  } catch (e) {
+  } catch {
     ElMessage.error('生成模拟流量失败')
   } finally {
     simLoading.value = false
@@ -508,7 +514,7 @@ async function clearData() {
     ElMessage.success(`数据已清空: ${JSON.stringify(res.data.cleared)}`)
     detectResult.value = null
     await loadData()
-  } catch (e) {
+  } catch {
     ElMessage.error('清空数据失败')
   } finally {
     clearLoading.value = false
@@ -679,30 +685,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dashboard-grid {
+.console-grid,
+.alert-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
-  gap: 22px;
+  gap: 18px;
 }
 
-.panel-header,
-.status-line,
-.control-actions,
-.scenario-actions {
+.console-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  margin-bottom: 18px;
 }
 
 .panel-header {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .panel-header__title {
   color: var(--gg-text-strong);
   font-size: 20px;
   font-weight: 700;
-  font-family: var(--gg-font-display);
 }
 
 .panel-header__desc {
@@ -711,113 +719,98 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.status-line {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.control-layout {
+.console-cards {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
-  gap: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
 }
 
-.control-form,
-.control-field {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.control-field label,
-.scenario-field label {
-  color: var(--gg-text-soft);
-  font-size: 13px;
-}
-
-.control-actions {
-  flex-wrap: wrap;
-}
-
-.signal-board {
+.console-card {
   display: grid;
   gap: 12px;
-}
-
-.signal-board__item {
-  padding: 16px 18px;
+  padding: 16px;
   border-radius: 18px;
-  background: linear-gradient(180deg, #f7faff, #eff5ff);
-  border: 1px solid rgba(12, 91, 216, 0.08);
+  border: 1px solid var(--gg-line);
+  background: var(--gg-surface-soft);
 }
 
-.signal-board__item span {
-  display: block;
-  color: var(--gg-text-soft);
-  font-size: 12px;
+.console-card__title,
+.maintenance-item__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gg-text-strong);
 }
 
-.signal-board__item strong {
-  display: block;
-  margin-top: 8px;
-  color: var(--gg-primary-deep);
-  font-size: 28px;
-  font-family: var(--gg-font-display);
-}
-
-.scenario-panel {
-  min-height: 100%;
-}
-
-.scenario-panel :deep(.el-card__body) {
-  height: 100%;
-}
-
-.scenario-panel__eyebrow {
-  color: rgba(147, 202, 248, 0.86);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.scenario-panel h3 {
-  margin: 12px 0 10px;
-  font-size: 28px;
-  font-family: var(--gg-font-display);
-}
-
-.scenario-panel p {
-  margin: 0;
-  color: rgba(220, 232, 248, 0.8);
-  line-height: 1.7;
-}
-
-.scenario-field {
-  margin-top: 22px;
-}
-
-.scenario-status {
-  margin-top: 16px;
+.console-row,
+.maintenance-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 10px;
 }
 
-.scenario-status__text {
-  color: rgba(220, 232, 248, 0.78);
+.console-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.console-actions :deep(.el-button) {
+  width: 100%;
+  margin: 0;
+}
+
+.console-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.summary-box {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--gg-line);
+  background: #fff;
+}
+
+.summary-box span {
+  display: block;
+  color: var(--gg-text-soft);
+  font-size: 12px;
+}
+
+.summary-box strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  color: var(--gg-text-strong);
+}
+
+.console-hint,
+.maintenance-item__desc,
+.dialog-tip {
+  color: var(--gg-text-soft);
+  line-height: 1.7;
   font-size: 13px;
-  line-height: 1.6;
 }
 
-.scenario-actions {
-  margin-top: 18px;
-  flex-wrap: wrap;
+.console-result {
+  margin-top: 16px;
 }
 
-.scenario-result,
-.scenario-clean {
-  margin-top: 18px;
+.maintenance-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.maintenance-item {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--gg-line);
+  background: var(--gg-surface-soft);
 }
 
 .alert-card :deep(.el-card__body) {
@@ -832,8 +825,8 @@ onUnmounted(() => {
 .alert-item {
   display: flex;
   gap: 14px;
-  padding: 16px 12px;
-  border-bottom: 1px solid rgba(16, 62, 121, 0.08);
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--gg-line);
 }
 
 .alert-item:last-child {
@@ -853,7 +846,7 @@ onUnmounted(() => {
 }
 
 .alert-item__marker.severity-medium {
-  background: var(--gg-gold);
+  background: var(--gg-warning);
 }
 
 .alert-item__marker.severity-low {
@@ -874,22 +867,14 @@ onUnmounted(() => {
 
 .alert-item__text {
   margin-top: 8px;
-  color: var(--gg-text);
   line-height: 1.7;
 }
 
-.packet-summary {
-  color: var(--gg-text-soft);
-}
-
-.dialog-tip {
-  color: var(--gg-text-soft);
-  font-size: 12px;
-}
-
-@media (max-width: 1080px) {
-  .dashboard-grid,
-  .control-layout {
+@media (max-width: 1180px) {
+  .console-grid,
+  .alert-grid,
+  .console-cards,
+  .console-summary {
     grid-template-columns: 1fr;
   }
 }
