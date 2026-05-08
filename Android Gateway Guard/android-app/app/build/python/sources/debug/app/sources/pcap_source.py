@@ -85,29 +85,114 @@ class PcapSource(DataSource):
             raise RuntimeError(f"BLF import failed: {exc}") from exc
 
     def _load_pcap(self) -> None:
-        """加载 PCAP 格式的网络抓包。"""
+        """加载 PCAP 格式的抓包。
+
+        - SocketCAN 链路类型 (linktype 227) 或包含 scapy ``CAN`` 层的报文
+          按 CAN 帧解析，写入 ``protocol="CAN"`` + 真实 ``msg_id``，让基于
+          CAN 族的检测器（Timing/Replay/RPM/Gear/IDBehavior/Payload/IForest）
+          能够建模和告警。
+        - 其它链路（Ethernet / SLL 等）作为 ``protocol="ETH"`` 入库，并尽量
+          填充真实的 src/dst/EtherType/IP/端口；``msg_id`` 不再用包长度伪造。
+        """
         try:
-            from scapy.all import rdpcap
-            packets = rdpcap(self.file_path)
-            for pkt in packets:
-                raw = bytes(pkt)
-                ts = float(pkt.time) if hasattr(pkt, 'time') else time.time()
-                unified = UnifiedPacket(
-                    timestamp=ts,
-                    protocol="ETH",
-                    source=getattr(pkt, 'src', 'unknown'),
-                    destination=getattr(pkt, 'dst', 'unknown'),
-                    msg_id=f"0x{len(raw):04X}",
-                    payload_hex=raw.hex().upper()[:256],
-                    payload_decoded={"length": len(raw)},
-                    domain="unknown",
-                    metadata={"source_file": self.file_path},
-                )
-                self._buffer.append(unified)
+            from scapy.all import PcapReader
         except ImportError as exc:
             raise RuntimeError("PCAP import requires scapy.") from exc
+
+        try:
+            from scapy.layers.can import CAN as ScapyCAN
+        except Exception:
+            ScapyCAN = None
+
+        try:
+            with PcapReader(self.file_path) as reader:
+                linktype = getattr(reader, "linktype", None)
+                for pkt in reader:
+                    ts = float(pkt.time) if hasattr(pkt, "time") else time.time()
+                    if ScapyCAN is not None and pkt.haslayer(ScapyCAN):
+                        self._buffer.append(self._unpack_can_frame(pkt[ScapyCAN], ts))
+                        continue
+                    self._buffer.append(self._unpack_eth_frame(pkt, ts, linktype))
+        except RuntimeError:
+            raise
         except Exception as exc:
             raise RuntimeError(f"PCAP import failed: {exc}") from exc
+
+    def _unpack_can_frame(self, can_layer, ts: float) -> UnifiedPacket:
+        raw_id = int(getattr(can_layer, "identifier", 0)) & 0x1FFFFFFF
+        msg_id = f"0x{raw_id:03X}"
+        data_field = getattr(can_layer, "data", b"") or b""
+        try:
+            payload_hex = bytes(data_field).hex().upper()
+        except Exception:
+            payload_hex = ""
+        return self._parser.parse(
+            msg_id=msg_id,
+            payload_hex=payload_hex,
+            timestamp=ts,
+        )
+
+    def _unpack_eth_frame(self, pkt, ts: float, linktype) -> UnifiedPacket:
+        src = str(getattr(pkt, "src", "") or "unknown")
+        dst = str(getattr(pkt, "dst", "") or "unknown")
+        eth_type = int(getattr(pkt, "type", 0) or 0)
+
+        ip_src = ip_dst = None
+        sport = dport = None
+        transport = "ETH"
+        try:
+            from scapy.layers.inet import IP, UDP, TCP
+
+            if pkt.haslayer(IP):
+                ip_layer = pkt[IP]
+                ip_src = ip_layer.src
+                ip_dst = ip_layer.dst
+                if pkt.haslayer(UDP):
+                    sport = int(pkt[UDP].sport)
+                    dport = int(pkt[UDP].dport)
+                    transport = "UDP"
+                elif pkt.haslayer(TCP):
+                    sport = int(pkt[TCP].sport)
+                    dport = int(pkt[TCP].dport)
+                    transport = "TCP"
+        except Exception:
+            pass
+
+        if dport is not None:
+            msg_id = f"{transport.lower()}:{dport}"
+        elif eth_type:
+            msg_id = f"eth:0x{eth_type:04X}"
+        else:
+            msg_id = "eth:unknown"
+
+        raw = bytes(pkt)
+        payload_hex = raw.hex().upper()[:512]
+        decoded = {
+            "length": len(raw),
+            "ether_type": f"0x{eth_type:04X}" if eth_type else "",
+            "ip_src": ip_src or "",
+            "ip_dst": ip_dst or "",
+            "sport": sport,
+            "dport": dport,
+            "transport": transport,
+        }
+        domain = "infotainment" if transport in ("UDP", "TCP") else "unknown"
+
+        return UnifiedPacket(
+            timestamp=ts,
+            protocol="ETH",
+            source=src,
+            destination=dst,
+            msg_id=msg_id,
+            payload_hex=payload_hex,
+            payload_decoded=decoded,
+            domain=domain,
+            metadata={
+                "source_file": self.file_path,
+                "linktype": linktype,
+                "transport": transport,
+            },
+        )
 
     def _load_asc(self) -> None:
         """加载 ASC 格式的 CAN 日志。"""
