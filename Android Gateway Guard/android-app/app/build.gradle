@@ -4,6 +4,17 @@ plugins {
     id 'com.chaquo.python'
 }
 
+def releaseKeystoreFile = rootProject.file("keystore/release-keystore.jks")
+def releaseStorePassword = (project.findProperty("release.storePassword")
+        ?: System.getenv("RELEASE_STORE_PASSWORD")
+        ?: "gatewayguard123").toString()
+def releaseKeyAlias = (project.findProperty("release.keyAlias")
+        ?: System.getenv("RELEASE_KEY_ALIAS")
+        ?: "gatewayguard").toString()
+def releaseKeyPassword = (project.findProperty("release.keyPassword")
+        ?: System.getenv("RELEASE_KEY_PASSWORD")
+        ?: releaseStorePassword).toString()
+
 android {
     namespace 'com.gatewayguard.android'
     compileSdk 36
@@ -16,7 +27,16 @@ android {
         versionName "1.0"
 
         ndk {
-            abiFilters "arm64-v8a"
+            abiFilters "x86_64", "arm64-v8a"
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile releaseKeystoreFile
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
         }
     }
 
@@ -26,6 +46,10 @@ android {
         }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
+            ndk {
+                abiFilters "arm64-v8a"
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -43,8 +67,16 @@ android {
 
 chaquopy {
     defaultConfig {
-        version = "3.10"
-        buildPython("C:/Users/H2Q/AppData/Local/Programs/Python/Python310/python.exe")
+        def chaquopyVersion = (project.findProperty("chaquopy.version")
+                ?: System.getenv("CHAQUOPY_VERSION")
+                ?: "3.12").toString()
+        version = chaquopyVersion
+        def hostPython = project.findProperty("chaquopy.python") ?: System.getenv("CHAQUOPY_PYTHON")
+        if (hostPython != null && !hostPython.toString().trim().isEmpty()) {
+            buildPython(hostPython.toString())
+        } else {
+            buildPython("python")
+        }
         pip {
             install("-r", "../../backend/requirements-android.txt")
         }
@@ -52,6 +84,8 @@ chaquopy {
     sourceSets {
         main {
             srcDir "../../backend"
+            include "app/**"
+            include "android_entry.py"
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.gatewayguard.android
 
-import android.app.Activity
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
@@ -73,7 +72,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun startBackendAndLoadUi() {
-        withContext(Dispatchers.Main) { statusView.text = "Starting Python backend..." }
+        withContext(Dispatchers.Main) { statusView.text = getString(R.string.starting_python_backend) }
         try {
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(applicationContext))
@@ -87,7 +86,10 @@ class MainActivity : AppCompatActivity() {
             )
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
-                statusView.text = "Backend startup failed: ${e.message}"
+                statusView.text = getString(
+                    R.string.backend_startup_failed,
+                    e.message ?: getString(R.string.unknown_error)
+                )
             }
             return
         }
@@ -95,10 +97,10 @@ class MainActivity : AppCompatActivity() {
         val ready = waitBackendReady()
         withContext(Dispatchers.Main) {
             if (ready) {
-                statusView.text = "Backend ready: $backendUrl/ui/"
+                statusView.text = getString(R.string.backend_ready, "$backendUrl/ui/")
                 webView.loadUrl("$backendUrl/ui/")
             } else {
-                statusView.text = "Backend not ready. Check /api/system/logs/recent when available."
+                statusView.text = getString(R.string.backend_not_ready_detailed, backendFailureDetails())
             }
         }
     }
@@ -120,6 +122,27 @@ class MainActivity : AppCompatActivity() {
             connection.requestMethod = "GET"
             connection.responseCode in 200..299
         }.getOrDefault(false)
+    }
+
+    private fun backendFailureDetails(): String {
+        val state = runCatching {
+            if (!Python.isStarted()) return@runCatching "Python not started"
+            val py = Python.getInstance()
+            py.getModule("android_entry").callAttr("get_backend_state_json").toString()
+        }.getOrElse {
+            "state unavailable: ${it.message}"
+        }
+
+        val logTail = runCatching {
+            val logFile = File(filesDir, "logs/backend.log")
+            if (!logFile.exists()) return@runCatching "log not found: ${logFile.absolutePath}"
+            val lines = logFile.readText(Charsets.UTF_8).lines()
+            lines.takeLast(30).joinToString("\n")
+        }.getOrElse {
+            "log read failed: ${it.message}"
+        }
+
+        return "state=$state\n\nrecent logs:\n$logTail"
     }
 
     private fun pickCaptureFile() {
@@ -154,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         withContext(Dispatchers.Main) {
-            statusView.text = "Imported file copied to private dir: ${dest.name}"
+            statusView.text = getString(R.string.imported_file_copied, dest.name)
         }
         return body
     }

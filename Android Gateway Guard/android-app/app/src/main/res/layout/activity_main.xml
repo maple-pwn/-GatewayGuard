@@ -9,7 +9,7 @@
         android:id="@+id/statusView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Starting backend..."
+        android:text="@string/starting_backend"
         android:textSize="14sp"
         android:padding="8dp" />
 
