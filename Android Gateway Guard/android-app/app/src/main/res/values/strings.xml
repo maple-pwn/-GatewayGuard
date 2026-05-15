@@ -4,9 +4,7 @@
     <string name="starting_python_backend">正在启动 Python 后端...</string>
     <string name="backend_startup_failed">后端启动失败：%1$s</string>
     <string name="backend_ready">后端已就绪：%1$s</string>
-    <string name="backend_not_ready_detailed">后端尚未就绪。
-
-%1$s</string>
+    <string name="backend_not_ready_detailed">后端尚未就绪。\n\n%1$s</string>
     <string name="imported_file_copied">导入文件已复制到私有目录：%1$s</string>
     <string name="unknown_error">未知错误</string>
 </resources>
