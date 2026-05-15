@@ -4,8 +4,9 @@
  * 自动重连 + 事件分发，替代 3 秒轮询机制。
  */
 
-const WS_BASE = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
-const WS_URL = `${WS_BASE}/ws/realtime`
+import { realtimeWsUrl } from './server.js'
+
+const WS_URL = realtimeWsUrl()
 
 const RECONNECT_BASE = 1000
 const RECONNECT_MAX = 10000

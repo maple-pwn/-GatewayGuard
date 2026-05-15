@@ -76,6 +76,39 @@ class TestCollectorAPI:
         assert resp2.status_code == 200
 
 
+class TestMobileAPI:
+    @pytest.mark.asyncio
+    async def test_mobile_ingest_accepts_android_packets(self, client):
+        payload = {
+            "device_id": "unit-android",
+            "device_name": "Unit Android",
+            "packets": [
+                {
+                    "timestamp": time.time(),
+                    "protocol": "CAN",
+                    "source": "android",
+                    "destination": "gateway",
+                    "msg_id": "0x123",
+                    "payload_hex": "01020304",
+                    "payload_decoded": {"speed": 12},
+                    "domain": "powertrain",
+                    "metadata": {"test": True},
+                }
+            ],
+        }
+
+        resp = await client.post("/api/mobile/ingest", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "accepted"
+        assert data["received"] == 1
+        assert data["stats"]["total_packets"] >= 1
+
+        status = await client.get("/api/mobile/status")
+        assert status.status_code == 200
+        assert status.json()["device_id"] == "unit-android"
+
+
 class TestAnomalyAPI:
     @pytest.mark.asyncio
     async def test_status_defaults_to_untrained(self, client):

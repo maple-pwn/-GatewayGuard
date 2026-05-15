@@ -44,3 +44,15 @@ detector:
   gear_can_id: "auto"        # "auto" or explicit CAN ID like "0x43F"
   vehicle_profile: "default"
   profile_dir: "./profiles"
+
+relay:
+  # On the relay server: set this to require Android upload requests to send
+  # X-GatewayGuard-Key. Leave empty only for trusted LAN testing.
+  ingest_api_key: ""
+
+  # On the Windows local backend: enable this to subscribe to the relay server
+  # and mirror Android realtime data into the local Windows database/UI.
+  client_enabled: false
+  server_url: ""
+  server_api_key: ""
+  reconnect_seconds: 3.0

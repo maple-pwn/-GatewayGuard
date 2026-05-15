@@ -95,6 +95,15 @@ class SourcesConfig:
 
 
 @dataclass
+class RelayConfig:
+    ingest_api_key: str = ""
+    client_enabled: bool = False
+    server_url: str = ""
+    server_api_key: str = ""
+    reconnect_seconds: float = 3.0
+
+
+@dataclass
 class AppConfig:
     db_url: str = "sqlite+aiosqlite:///./gateway_guard.db"
     host: str = "0.0.0.0"
@@ -104,6 +113,7 @@ class AppConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    relay: RelayConfig = field(default_factory=RelayConfig)
 
 
 def _load_yaml() -> dict:
@@ -157,6 +167,9 @@ def load_config() -> AppConfig:
         sub_data = sources_data.get(sub, {})
         _apply_section(getattr(config.sources, sub), sub_data)
 
+    relay_data = data.get("relay", {})
+    _apply_section(config.relay, relay_data)
+
     # --- 环境变量层：优先级最高，覆盖 YAML ---
     if env_key := os.getenv("OPENAI_API_KEY"):
         config.llm.openai_api_key = env_key
@@ -164,6 +177,20 @@ def load_config() -> AppConfig:
         config.llm.provider = env_provider
     if env_ollama := os.getenv("OLLAMA_URL"):
         config.llm.ollama_base_url = env_ollama
+    if env_ingest_key := os.getenv("GATEWAY_GUARD_INGEST_KEY"):
+        config.relay.ingest_api_key = env_ingest_key
+    if env_relay_url := os.getenv("GATEWAY_GUARD_RELAY_SERVER_URL"):
+        config.relay.server_url = env_relay_url
+        config.relay.client_enabled = True
+    if env_relay_key := os.getenv("GATEWAY_GUARD_RELAY_API_KEY"):
+        config.relay.server_api_key = env_relay_key
+    if env_relay_enabled := os.getenv("GATEWAY_GUARD_RELAY_CLIENT_ENABLED"):
+        config.relay.client_enabled = env_relay_enabled.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     config.db_url = _resolve_sqlite_url(config.db_url)
 

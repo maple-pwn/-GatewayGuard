@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models.packet import PacketORM, TrafficStats, UnifiedPacket
 from app.platform import is_android_env
 from app.services.collector import collector
+from app.services.remote_sync import remote_sync
 from app.simulators.can_simulator import (
     generate_dos_attack,
     generate_fuzzy_attack,
@@ -197,6 +198,7 @@ async def simulate_traffic(
     )
 
     await _save_packets(packets, db)
+    await remote_sync.enqueue_packets(packets, source=f"simulate:{scenario}")
     return {"generated": len(packets), "attack_packets": attack_packets, "scenario": scenario}
 
 
@@ -243,5 +245,6 @@ async def import_file(
         await source.stop()
 
     await _save_packets(packets, db)
+    await remote_sync.enqueue_packets(packets, source="import")
     return {"imported": len(packets), "file": str(resolved)}
 

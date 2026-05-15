@@ -648,6 +648,22 @@ function initWebSocket() {
     }
   })
 
+  rtWs.on('traffic_update', (data) => {
+    if (data?.stats) {
+      stats.value = data.stats
+    }
+    if (!pollTimer) {
+      pollTimer = setInterval(() => loadData(), 5000)
+    }
+  })
+
+  rtWs.on('packets_update', (rows) => {
+    if (!Array.isArray(rows) || !rows.length) {
+      return
+    }
+    packets.value = [...rows, ...packets.value].slice(0, 50)
+  })
+
   rtWs.on('alerts', (alerts) => {
     for (const a of alerts) {
       realtimeAlerts.value.unshift(a)

@@ -137,6 +137,19 @@ class SourcesConfig:
 
 
 @dataclass
+class RemoteSyncConfig:
+    enabled: bool = False
+    target_url: str = ""
+    api_key: str = ""
+    device_id: str = "android-gateway"
+    device_name: str = "Android Gateway"
+    batch_size: int = 200
+    flush_interval_ms: int = 1000
+    max_queue_size: int = 20000
+    timeout_seconds: float = 8.0
+
+
+@dataclass
 class AppConfig:
     db_url: str = ""
     host: str = "127.0.0.1"
@@ -153,6 +166,7 @@ class AppConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
+    remote_sync: RemoteSyncConfig = field(default_factory=RemoteSyncConfig)
 
 
 def _load_yaml(config_path: Path) -> dict:
@@ -231,12 +245,24 @@ def load_config() -> AppConfig:
     for sub in ("can", "ethernet", "pcap", "collector"):
         _apply_section(getattr(config.sources, sub), sources_data.get(sub, {}))
 
+    remote_sync_data = data.get("remote_sync", {})
+    _apply_section(config.remote_sync, remote_sync_data)
+
     if env_key := os.getenv("OPENAI_API_KEY"):
         config.llm.openai_api_key = env_key
     if env_provider := os.getenv("LLM_PROVIDER"):
         config.llm.provider = env_provider
     if env_ollama := os.getenv("OLLAMA_URL"):
         config.llm.ollama_base_url = env_ollama
+    if env_remote := os.getenv("GATEWAY_GUARD_REMOTE_URL"):
+        config.remote_sync.target_url = env_remote
+        config.remote_sync.enabled = True
+    if env_remote_key := os.getenv("GATEWAY_GUARD_REMOTE_API_KEY"):
+        config.remote_sync.api_key = env_remote_key
+    if env_device_id := os.getenv("GATEWAY_GUARD_DEVICE_ID"):
+        config.remote_sync.device_id = env_device_id
+    if env_device_name := os.getenv("GATEWAY_GUARD_DEVICE_NAME"):
+        config.remote_sync.device_name = env_device_name
 
     _finalize_paths(config, runtime_home)
     return config

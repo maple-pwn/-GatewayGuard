@@ -1,0 +1,17 @@
+[Unit]
+Description=GatewayGuard relay-only server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=h2q
+Group=h2q
+WorkingDirectory=/home/h2q/gatewayguard-relay
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/h2q/gatewayguard-relay/.relay-venv/bin/uvicorn relay_server:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

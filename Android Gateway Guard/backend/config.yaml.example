@@ -44,3 +44,17 @@ detector:
   gear_can_id: "auto"        # "auto" or explicit CAN ID like "0x43F"
   vehicle_profile: "default"
   profile_dir: "./profiles"
+
+remote_sync:
+  enabled: true
+  # Windows backend reachable from the Android device, for example:
+  # target_url: "https://relay.example.com"
+  target_url: "http://114.55.164.250:8000"
+  # Sent as X-GatewayGuard-Key when the relay server requires upload auth.
+  api_key: ""
+  device_id: "android-gateway"
+  device_name: "Android Gateway"
+  batch_size: 200
+  flush_interval_ms: 1000
+  max_queue_size: 20000
+  timeout_seconds: 8.0

@@ -14,6 +14,7 @@ from app.models.anomaly import AnomalyEventORM
 from app.models.packet import PacketORM, UnifiedPacket
 from app.platform import is_android_env
 from app.services.anomaly_detector import AnomalyDetectorService
+from app.services.remote_sync import remote_sync
 from app.services.ws_manager import ws_manager
 from app.sources.base import DataSource
 
@@ -191,6 +192,7 @@ class CollectorService:
                 )
                 db.add(orm)
             await db.commit()
+            await remote_sync.enqueue_packets(packets, source="collector")
 
             if not self._detector.is_trained:
                 alerts = []
@@ -246,6 +248,7 @@ class CollectorService:
 
             self._stats["total_anomalies"] += len(alerts)
             if alerts:
+                await remote_sync.enqueue_alerts(alerts)
                 await ws_manager.broadcast(
                     {
                         "type": "alerts",

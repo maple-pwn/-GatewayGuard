@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { API_BASE_URL } from './server.js'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({ baseURL: API_BASE_URL })
 
 export const trafficApi = {
   getStats: () => api.get('/traffic/stats'),

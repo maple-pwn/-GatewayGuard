@@ -1,0 +1,19 @@
+app:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  db_url: "sqlite+aiosqlite:///./gateway_guard.db"
+  cors_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://114.55.164.250:5173"
+    - "http://114.55.164.250"
+
+relay:
+  # Keep empty for no app-level key. Set a key here only if the Android app and
+  # Windows relay client are configured with the same value.
+  ingest_api_key: ""
+  client_enabled: false
+  server_url: ""
+  server_api_key: ""
+  reconnect_seconds: 3.0

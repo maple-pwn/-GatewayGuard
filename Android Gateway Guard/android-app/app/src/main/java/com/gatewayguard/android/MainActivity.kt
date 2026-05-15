@@ -2,6 +2,7 @@ package com.gatewayguard.android
 
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.webkit.JavascriptInterface
@@ -33,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
 
     private val backendUrl = "http://127.0.0.1:8000"
+    private val defaultRemoteUrl = "http://114.55.164.250:8000"
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -72,7 +74,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun startBackendAndLoadUi() {
-        withContext(Dispatchers.Main) { statusView.text = getString(R.string.starting_python_backend) }
+        withContext(Dispatchers.Main) {
+            statusView.text = getString(R.string.starting_python_backend)
+        }
         try {
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(applicationContext))
@@ -100,7 +104,33 @@ class MainActivity : AppCompatActivity() {
                 statusView.text = getString(R.string.backend_ready, "$backendUrl/ui/")
                 webView.loadUrl("$backendUrl/ui/")
             } else {
-                statusView.text = getString(R.string.backend_not_ready_detailed, backendFailureDetails())
+                statusView.text = getString(
+                    R.string.backend_not_ready_detailed,
+                    backendFailureDetails()
+                )
+            }
+        }
+        if (ready) {
+            configureDefaultRemoteSync()
+        }
+    }
+
+    private fun configureDefaultRemoteSync() {
+        ioScope.launch {
+            val result = runCatching {
+                val payload = JSONObject()
+                    .put("target_url", defaultRemoteUrl)
+                    .put("enabled", true)
+                    .put("api_key", "")
+                    .put("device_name", "Android Gateway (${Build.MODEL})")
+                postJson("$backendUrl/api/mobile/sync/config", payload)
+            }
+            withContext(Dispatchers.Main) {
+                val base = getString(R.string.backend_ready, "$backendUrl/ui/")
+                statusView.text = result.fold(
+                    onSuccess = { "$base | Sync: $defaultRemoteUrl" },
+                    onFailure = { "$base | Sync setup failed: ${it.message}" }
+                )
             }
         }
     }
@@ -202,6 +232,28 @@ class MainActivity : AppCompatActivity() {
                 webView.evaluateJavascript("window.onNativeImportResult($quoted);", null)
             }
         }
+    }
+
+    private fun postJson(url: String, payload: JSONObject): String {
+        val connection = URI.create(url).toURL().openConnection() as HttpURLConnection
+        val bytes = payload.toString().toByteArray(Charsets.UTF_8)
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 5000
+        connection.readTimeout = 10000
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        connection.setRequestProperty("Accept", "application/json")
+        connection.outputStream.use { it.write(bytes) }
+        val body = if (connection.responseCode in 200..299) {
+            connection.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            connection.errorStream?.bufferedReader()?.use { it.readText() }
+                ?: "HTTP ${connection.responseCode}"
+        }
+        if (connection.responseCode !in 200..299) {
+            throw IllegalStateException(body)
+        }
+        return body
     }
 
     class AndroidBridge(private val activity: MainActivity) {

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#17212f" />
+  <title>GatewayGuard AI 助手</title>
+  <link rel="stylesheet" href="/ui/static/ui/ui.css?v=relay1" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="status-stack">
+        <div class="status-card">
+          <div class="status-k">报文数量</div>
+          <div id="packetCountValue" class="status-v">0</div>
+        </div>
+        <div class="status-card">
+          <div class="status-k">报警数量</div>
+          <div id="alertCountValue" class="status-v">0</div>
+        </div>
+      </div>
+
+      <div class="api-key-panel">
+        <label class="field-label" for="apiKeyInput">OpenAI API Key</label>
+        <input id="apiKeyInput" type="password" placeholder="sk-..." value="" />
+        <button id="btnSaveApiKey" class="sidebar-btn primary">写入 API Key</button>
+      </div>
+
+      <div class="relay-panel">
+        <label class="field-label" for="relayUrlInput">Relay Server</label>
+        <input id="relayUrlInput" type="url" placeholder="http://114.55.164.250:8000" value="" />
+        <label class="field-label" for="relayKeyInput">Relay API Key</label>
+        <input id="relayKeyInput" type="password" placeholder="optional" value="" />
+        <div class="relay-actions">
+          <button id="btnRelayTest" class="sidebar-btn">Test</button>
+          <button id="btnRelaySync" class="sidebar-btn primary">Sync</button>
+          <button id="btnRelayStatus" class="sidebar-btn">Status</button>
+          <button id="btnRelayStop" class="sidebar-btn danger">Stop</button>
+        </div>
+        <div id="relayStatusText" class="relay-status">Relay: checking...</div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button id="btnChatPage" class="sidebar-btn active">AI 助手</button>
+        <button id="btnConsole" class="sidebar-btn">模拟控制台</button>
+        <button id="btnLogs" class="sidebar-btn">日志</button>
+        <button id="btnAbout" class="sidebar-btn">关于我们</button>
+      </div>
+
+      <div class="sidebar-foot">
+        <div>会话时钟</div>
+        <div id="clock">--:--</div>
+      </div>
+    </aside>
+
+    <main class="chat-page">
+      <section id="pageChat" class="page-panel active">
+        <section id="chatList" class="chat-list"></section>
+
+        <section class="composer">
+          <textarea id="chatInput" placeholder="例如：请根据当前日志判断后端是否正常，并给出下一步排查建议。"></textarea>
+          <div class="composer-actions">
+            <button id="btnResetChat" class="secondary">重置会话</button>
+            <button id="btnSendChat" class="primary">发送消息</button>
+          </div>
+        </section>
+      </section>
+
+      <section id="pageConsole" class="page-panel info-panel">
+        <div class="panel-head">模拟控制台</div>
+        <div class="console-grid">
+          <div class="console-top">
+            <div class="console-card">
+              <div class="console-title">模拟流量</div>
+              <div class="console-row">
+                <select id="scenario">
+                  <option value="normal">normal</option>
+                  <option value="dos">dos</option>
+                  <option value="fuzzy">fuzzy</option>
+                  <option value="spoofing">spoofing</option>
+                  <option value="mixed">mixed</option>
+                </select>
+                <input id="count" type="number" value="120" min="1" max="1000" />
+              </div>
+              <button id="btnSimulate" class="console-btn primary">生成模拟流量</button>
+            </div>
+
+            <div class="console-card">
+              <div class="console-title">检测器</div>
+              <div class="console-actions">
+                <button id="btnTrain" class="console-btn primary">训练AI</button>
+                <button id="btnDetect" class="console-btn">AI检测流量</button>
+                <button id="btnStats" class="console-btn">流量统计</button>
+              </div>
+            </div>
+
+            <div class="console-card">
+              <div class="console-title">实时流量</div>
+              <div class="console-actions">
+                <button id="btnRealtimeStart" class="console-btn primary">启动实时流量</button>
+                <button id="btnRealtimeStatus" class="console-btn">查看实时状态</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="console-card console-output-card">
+            <div class="console-title">检测详情</div>
+            <div id="consolePanel" class="console-output">
+              <div class="console-empty">等待操作</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pageLogs" class="page-panel info-panel">
+        <div class="panel-head">日志</div>
+        <pre id="logsPanel" class="info-box">等待加载</pre>
+      </section>
+
+      <section id="pageAbout" class="page-panel info-panel">
+        <div class="panel-head">关于我们</div>
+        <div id="aboutPanel" class="about-box"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/ui/static/ui/ui.js?v=relay1"></script>
+</body>
+</html>

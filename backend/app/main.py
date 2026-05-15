@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import traffic, anomaly, llm, system, ws
+from app.routers import traffic, anomaly, llm, system, ws, mobile
 from app.services.collector import collector
+from app.services.relay_client import relay_client
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,16 @@ async def lifespan(app: FastAPI):
     if settings.sources.collector.enabled:
         logger.info("Auto-starting collector (mode=%s)", settings.sources.mode)
         await collector.start()
+    if settings.relay.client_enabled:
+        logger.info("Starting relay client (server=%s)", settings.relay.server_url)
+        await relay_client.start()
 
     yield
 
     # 优雅关闭采集器
     if collector.running:
         await collector.stop()
+    await relay_client.stop()
 
 
 app = FastAPI(
@@ -50,6 +55,7 @@ app.include_router(anomaly.router)
 app.include_router(llm.router)
 app.include_router(system.router)
 app.include_router(ws.router)
+app.include_router(mobile.router)
 
 
 @app.get("/")
