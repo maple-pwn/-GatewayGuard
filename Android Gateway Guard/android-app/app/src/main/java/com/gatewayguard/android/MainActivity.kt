@@ -5,10 +5,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,16 +40,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.CoroutineScope
@@ -74,9 +67,9 @@ import java.net.URLEncoder
 
 class MainActivity : ComponentActivity() {
 
-    private var webView: WebView? = null
     private var uiState by mutableStateOf(CarUiState())
     private var autoRefreshJob: Job? = null
+    private var importResultPanel: CarPanel = CarPanel.Console
 
     private val backendUrl = "http://127.0.0.1:8000"
     private val defaultRemoteUrl = "http://114.55.164.250:8000"
@@ -84,7 +77,7 @@ class MainActivity : ComponentActivity() {
 
     private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) {
-            pushImportResult("{\"error\":\"No file selected\"}")
+            cancelImport()
             return@registerForActivityResult
         }
         ioScope.launch {
@@ -109,8 +102,6 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         autoRefreshJob?.cancel()
-        webView?.destroy()
-        webView = null
         ioScope.cancel()
     }
 
@@ -150,7 +141,6 @@ class MainActivity : ComponentActivity() {
                     backendStatus = getString(R.string.backend_ready, "$backendUrl/ui/")
                 )
             }
-            loadWebUiIfAvailable()
             configureDefaultRemoteSync()
             refreshOverview(showResult = false)
             startAutoRefresh()
@@ -166,20 +156,6 @@ class MainActivity : ComponentActivity() {
                     resultBody = backendFailureDetails()
                 )
             }
-        }
-    }
-
-    private fun configureWebView(view: WebView) {
-        view.settings.javaScriptEnabled = true
-        view.settings.domStorageEnabled = true
-        view.webViewClient = WebViewClient()
-        view.webChromeClient = WebChromeClient()
-        view.addJavascriptInterface(AndroidBridge(this), "AndroidBridge")
-    }
-
-    private fun loadWebUiIfAvailable() {
-        runOnUiThread {
-            webView?.loadUrl("$backendUrl/ui/")
         }
     }
 
@@ -249,13 +225,50 @@ class MainActivity : ComponentActivity() {
         return "state=$state\n\nrecent logs:\n$logTail"
     }
 
-    private fun pickCaptureFile() {
+    private fun pickCaptureFile(panel: CarPanel = CarPanel.Console) {
+        importResultPanel = panel
         filePicker.launch(arrayOf("*/*"))
     }
 
+    private fun importsDir(): File {
+        return File(filesDir, "imports").also { if (!it.exists()) it.mkdirs() }
+    }
+
+    private fun scanImportFiles(): List<ImportFile> {
+        return importsDir()
+            .listFiles()
+            ?.filter { it.isFile }
+            ?.sortedByDescending { it.lastModified() }
+            ?.map { ImportFile(it.name, it.absolutePath, it.length()) }
+            ?: emptyList()
+    }
+
+    private fun refreshImportFiles(panel: CarPanel = CarPanel.Import) {
+        updateUi { it.copy(activePanel = panel, importFiles = scanImportFiles()) }
+    }
+
+    private fun showImportPanel() {
+        refreshImportFiles(CarPanel.Import)
+    }
+
+    private fun importFixedFile(file: ImportFile) {
+        runAction("导入固定目录文件", CarPanel.Import) {
+            requestText("/api/traffic/import?file_path=${urlEncode(file.path)}", "POST")
+        }
+    }
+
+    private fun cancelImport() {
+        updateUi {
+            it.copy(
+                activePanel = importResultPanel,
+                resultTitle = "导入已取消",
+                resultBody = "未选择文件，已取消导入。"
+            )
+        }
+    }
+
     private suspend fun importUriToBackend(uri: Uri): String {
-        val importsDir = File(filesDir, "imports")
-        if (!importsDir.exists()) importsDir.mkdirs()
+        val importsDir = importsDir()
 
         val displayName = queryDisplayName(uri) ?: "capture_${System.currentTimeMillis()}.pcap"
         val safeName = displayName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
@@ -271,9 +284,10 @@ class MainActivity : ComponentActivity() {
 
         updateUi {
             it.copy(
-                activePanel = CarPanel.Console,
+                activePanel = importResultPanel,
                 resultTitle = "导入完成",
-                resultBody = "${getString(R.string.imported_file_copied, dest.name)}\n\n${prettyBody(body)}"
+                resultBody = "${getString(R.string.imported_file_copied, dest.name)}\n\n${friendlyBody(body)}",
+                importFiles = scanImportFiles()
             )
         }
         return body
@@ -293,13 +307,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun pushImportResult(jsonPayload: String) {
-        val quoted = JSONObject.quote(jsonPayload)
         runOnUiThread {
-            webView?.evaluateJavascript("window.onNativeImportResult($quoted);", null)
             uiState = uiState.copy(
-                activePanel = CarPanel.Console,
+                activePanel = importResultPanel,
                 resultTitle = "导入结果",
-                resultBody = prettyBody(jsonPayload)
+                resultBody = friendlyBody(jsonPayload),
+                importFiles = scanImportFiles()
             )
         }
     }
@@ -334,9 +347,9 @@ class MainActivity : ComponentActivity() {
         return body
     }
 
-    private fun refreshOverview(showResult: Boolean) {
+    private fun refreshOverview(showResult: Boolean, panel: CarPanel = CarPanel.Console) {
         if (!uiState.backendReady) {
-            if (showResult) showMessage("状态刷新", "后端尚未就绪，请等待启动完成。")
+            if (showResult) showMessage("状态刷新", "后端尚未就绪，请等待启动完成。", panel)
             return
         }
         ioScope.launch {
@@ -360,7 +373,7 @@ class MainActivity : ComponentActivity() {
             }.getOrElse {
                 "刷新失败：${it.message ?: it.javaClass.simpleName}"
             }
-            if (showResult) showMessage("状态刷新", output)
+            if (showResult) showMessage("状态刷新", output, panel)
         }
     }
 
@@ -379,10 +392,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun simulateTraffic() {
+    private fun simulateTraffic(panel: CarPanel = CarPanel.Console) {
         val scenario = uiState.scenario.trim().ifEmpty { "normal" }
         val count = uiState.simulateCount.trim().ifEmpty { "120" }
-        runAction("生成模拟流量") {
+        runAction("生成模拟流量", panel) {
             requestText(
                 "/api/traffic/simulate?scenario=${urlEncode(scenario)}&count=${urlEncode(count)}",
                 "POST"
@@ -390,14 +403,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun trainDetector() {
-        runAction("训练 AI 检测器") {
+    private fun trainDetector(panel: CarPanel = CarPanel.Console) {
+        runAction("训练 AI 检测器", panel) {
             requestText("/api/anomaly/train?limit=2000", "POST")
         }
     }
 
-    private fun detectAnomalies() {
-        runAction("AI 检测流量") {
+    private fun detectAnomalies(panel: CarPanel = CarPanel.Console) {
+        runAction("AI 检测流量", panel) {
             requestText("/api/anomaly/detect?limit=500", "POST")
         }
     }
@@ -408,8 +421,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startRealtimeTraffic() {
-        runAction("启动实时流量") {
+    private fun startRealtimeTraffic(panel: CarPanel = CarPanel.Console) {
+        runAction("启动实时流量", panel) {
             requestText("/api/traffic/collect/start?mode=simulator", "POST")
         }
     }
@@ -443,8 +456,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun enableRelay() {
-        runAction("Relay 同步") {
+    private fun enableRelay(panel: CarPanel = CarPanel.Console) {
+        runAction("Relay 同步", panel) {
             requestText("/api/mobile/sync/config", "POST", relayPayload(enabled = true))
         }
     }
@@ -458,6 +471,42 @@ class MainActivity : ComponentActivity() {
     private fun showRelayStatus() {
         runAction("Relay 状态") {
             requestText("/api/mobile/sync/status")
+        }
+    }
+
+    private fun showAlertsPanel() {
+        updateUi { it.copy(activePanel = CarPanel.Alerts, resultTitle = "", resultBody = "") }
+        loadAlerts()
+    }
+
+    private fun loadAlerts() {
+        if (!uiState.backendReady) {
+            showMessage("告警列表", "后端尚未就绪，请等待启动完成。", CarPanel.Alerts)
+            return
+        }
+        ioScope.launch {
+            val result = runCatching {
+                parseAlerts(requestText("/api/anomaly/events?limit=20"))
+            }
+            updateUi { state ->
+                result.fold(
+                    onSuccess = { alerts ->
+                        state.copy(
+                            activePanel = CarPanel.Alerts,
+                            alerts = alerts,
+                            resultTitle = if (alerts.isEmpty()) "告警列表" else "",
+                            resultBody = if (alerts.isEmpty()) "暂无告警。" else ""
+                        )
+                    },
+                    onFailure = {
+                        state.copy(
+                            activePanel = CarPanel.Alerts,
+                            resultTitle = "告警加载失败",
+                            resultBody = it.message ?: it.javaClass.simpleName
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -533,8 +582,10 @@ class MainActivity : ComponentActivity() {
             updateUi { state ->
                 body.fold(
                     onSuccess = {
-                        val formatted = prettyBody(it)
-                        state.copy(resultTitle = title, resultBody = formatted)
+                        val summary = resultSummary(title, it)
+                        val details = friendlyBody(it)
+                        val bodyText = if (details == summary || details.isBlank()) summary else "$summary\n\n$details"
+                        state.copy(resultTitle = title, resultBody = bodyText)
                     },
                     onFailure = {
                         state.copy(
@@ -552,16 +603,74 @@ class MainActivity : ComponentActivity() {
         updateUi { it.copy(activePanel = panel, resultTitle = title, resultBody = body) }
     }
 
+    private fun returnToDashboard() {
+        updateUi { it.copy(activePanel = CarPanel.Dashboard) }
+    }
+
+    private fun toggleThemeMode() {
+        updateUi { state ->
+            state.copy(
+                themeMode = if (state.themeMode == ThemeMode.Night) ThemeMode.Day else ThemeMode.Night
+            )
+        }
+    }
+
     private fun updateUi(transform: (CarUiState) -> CarUiState) {
         runOnUiThread {
             uiState = transform(uiState)
         }
     }
 
-    private fun prettyBody(body: String): String {
-        return runCatching { JSONObject(body).toString(2) }
-            .recoverCatching { JSONArray(body).toString(2) }
-            .getOrDefault(body)
+    private fun friendlyBody(body: String): String {
+        val trimmed = body.trim()
+        if (trimmed.isBlank()) return "操作已完成。"
+
+        runCatching { return formatJsonObject(JSONObject(trimmed)) }
+        runCatching { return formatJsonArray(JSONArray(trimmed)) }
+        return trimmed
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .take(12)
+            .joinToString("\n")
+    }
+
+    private fun resultSummary(title: String, body: String): String {
+        val json = runCatching { JSONObject(body) }.getOrNull()
+        if (json == null) {
+            return body.lineSequence().firstOrNull()?.take(120) ?: "操作已完成。"
+        }
+
+        return when {
+            title.contains("生成模拟流量") -> {
+                val generated = json.optLong("generated", json.optLong("count", 0))
+                val scenario = json.optString("scenario", uiState.scenario)
+                "已生成 $generated 条 $scenario 场景报文。"
+            }
+            title.contains("训练") -> {
+                val packets = json.optLong("packet_count", json.optLong("train_count", 0))
+                val trained = json.optBoolean("trained", false)
+                if (trained) "检测器训练完成，样本 $packets 条。" else "训练请求已返回，样本 $packets 条。"
+            }
+            title.contains("检测") -> {
+                val detected = json.optLong("detected", json.optLong("total", 0))
+                "检测完成，发现 $detected 条异常结果。"
+            }
+            title.contains("实时流量") || title.contains("启动实时流量") -> {
+                val running = json.optBoolean("running", json.optString("status") == "started")
+                if (running) "实时流量采集已启动。" else "实时流量状态已更新。"
+            }
+            title.contains("Relay 测试") -> {
+                if (json.optBoolean("ok", false)) {
+                    "Relay 测试通过：${json.optString("target_url", uiState.relayUrl)}"
+                } else {
+                    "Relay 测试失败：${json.optString("error", "unknown")}"
+                }
+            }
+            title.contains("Relay") || title.contains("同步") -> formatRelayStatus(body)
+            title.contains("导入") -> "导入操作已返回结果。"
+            else -> json.optString("message", json.optString("status", "操作已完成。"))
+        }
     }
 
     private fun formatRelayStatus(body: String): String {
@@ -580,29 +689,204 @@ class MainActivity : ComponentActivity() {
         }.getOrDefault("Relay: 状态未知")
     }
 
+    private fun parseAlerts(body: String): List<AlertItem> {
+        val json = JSONObject(body)
+        val events = json.optJSONArray("events") ?: JSONArray()
+        val alerts = mutableListOf<AlertItem>()
+        for (index in 0 until events.length()) {
+            val item = events.optJSONObject(index) ?: continue
+            val severityRaw = item.optString("severity")
+            alerts += AlertItem(
+                severity = friendlySeverity(severityRaw),
+                severityRank = severityRank(severityRaw),
+                type = friendlyAlertType(item.optString("anomaly_type")),
+                source = alertNodeText(item.optString("source_node"), item.optString("target_node"), item.optString("protocol")),
+                time = friendlyTime(item.optString("timestamp")),
+                timestamp = item.optString("timestamp"),
+                description = item.optString("description").ifBlank { "检测到异常流量模式。" },
+                status = friendlyStatus(item.optString("status")),
+                count = item.optLong("packet_count", 0).takeIf { it > 0 }
+            )
+        }
+        return alerts
+    }
+
+    private fun friendlySeverity(value: String): String {
+        return when (value.lowercase()) {
+            "critical", "high" -> "高风险"
+            "medium" -> "中风险"
+            "low" -> "低风险"
+            "info", "informational" -> "提示"
+            else -> "未分级"
+        }
+    }
+
+    private fun severityRank(value: String): Int {
+        return when (value.lowercase()) {
+            "critical" -> 4
+            "high" -> 3
+            "medium" -> 2
+            "low" -> 1
+            else -> 0
+        }
+    }
+
+    private fun friendlyStatus(value: String): String {
+        return when (value.lowercase()) {
+            "open", "new", "active" -> "待处理"
+            "acknowledged", "ack" -> "已确认"
+            "resolved", "closed" -> "已处理"
+            else -> "待查看"
+        }
+    }
+
+    private fun friendlyAlertType(value: String): String {
+        return when (value.lowercase()) {
+            "replay_suspected" -> "疑似重放攻击"
+            "rpm_anomaly", "rpm_spike" -> "转速异常"
+            "gear_anomaly", "invalid_gear" -> "挡位异常"
+            "ml_auxiliary" -> "疑似异常流量"
+            "dos", "dos_attack" -> "疑似拒绝服务攻击"
+            "fuzzy", "fuzzing" -> "疑似模糊测试流量"
+            "spoofing" -> "疑似伪造流量"
+            else -> "异常流量"
+        }
+    }
+
+    private fun alertNodeText(source: String, target: String, protocol: String): String {
+        val nodes = listOf(source, target).filter { it.isNotBlank() && it != "null" }
+        val endpoint = if (nodes.isEmpty()) "未知节点" else nodes.joinToString(" → ")
+        return if (protocol.isBlank() || protocol == "null") endpoint else "$endpoint / $protocol"
+    }
+
+    private fun friendlyTime(value: String): String {
+        if (value.isBlank() || value == "null") return "时间未知"
+        return value.replace("T", " ").substringBefore(".").take(19)
+    }
+
+    private fun visibleAlerts(state: CarUiState): List<AlertItem> {
+        val filtered = state.alerts.filter { alert ->
+            when (state.alertFilter) {
+                AlertFilter.All -> true
+                AlertFilter.High -> alert.severityRank >= 3
+                AlertFilter.Medium -> alert.severityRank == 2
+                AlertFilter.Low -> alert.severityRank == 1
+            }
+        }
+        return when (state.alertSort) {
+            AlertSort.Time -> filtered.sortedByDescending { it.timestamp }
+            AlertSort.Risk -> filtered.sortedWith(
+                compareByDescending<AlertItem> { it.severityRank }.thenByDescending { it.timestamp }
+            )
+        }
+    }
+
+    private fun formatJsonObject(json: JSONObject): String {
+        val keys = orderedKeys(json)
+        if (keys.isEmpty()) return "没有返回更多信息。"
+        return keys.joinToString("\n") { key ->
+            "${friendlyKey(key)}：${friendlyValue(json.opt(key))}"
+        }
+    }
+
+    private fun formatJsonArray(array: JSONArray): String {
+        if (array.length() == 0) return "没有记录。"
+        val lines = mutableListOf("共 ${array.length()} 条记录。")
+        val limit = minOf(array.length(), 5)
+        for (index in 0 until limit) {
+            val value = array.opt(index)
+            val itemText = friendlyValue(value).lineSequence().joinToString("；") { it.trim() }
+            lines += "${index + 1}. $itemText"
+        }
+        if (array.length() > limit) {
+            lines += "其余 ${array.length() - limit} 条已省略。"
+        }
+        return lines.joinToString("\n")
+    }
+
+    private fun orderedKeys(json: JSONObject): List<String> {
+        val priority = listOf(
+            "message", "status", "ok", "error", "last_error",
+            "generated", "count", "total", "total_packets", "packet_count",
+            "detected", "anomaly_count", "alert_count", "trained", "running",
+            "enabled", "queued_packets", "queued_alerts", "sent_packets", "sent_alerts",
+            "failed_batches", "scenario", "file", "file_path", "filename", "target_url"
+        )
+        val keys = mutableListOf<String>()
+        val iterator = json.keys()
+        while (iterator.hasNext()) {
+            keys += iterator.next()
+        }
+        return priority.filter { keys.contains(it) } + keys.filterNot { priority.contains(it) }.sorted()
+    }
+
+    private fun friendlyValue(value: Any?): String {
+        return when (value) {
+            null, JSONObject.NULL -> "无"
+            is Boolean -> if (value) "是" else "否"
+            is JSONObject -> formatJsonObject(value).prependIndent("  ").trimStart()
+            is JSONArray -> formatJsonArray(value).prependIndent("  ").trimStart()
+            is String -> value.ifBlank { "无" }
+            else -> value.toString()
+        }
+    }
+
+    private fun friendlyKey(key: String): String {
+        return when (key) {
+            "ok" -> "是否成功"
+            "message" -> "提示信息"
+            "status" -> "状态"
+            "error" -> "错误信息"
+            "last_error" -> "最近错误"
+            "generated" -> "生成数量"
+            "count" -> "数量"
+            "total" -> "总数"
+            "total_packets" -> "总报文数"
+            "packet_count" -> "报文数"
+            "detected" -> "检测结果数"
+            "anomaly_count" -> "异常数量"
+            "alert_count" -> "告警数量"
+            "trained" -> "是否完成训练"
+            "running" -> "是否运行中"
+            "enabled" -> "是否启用"
+            "queued_packets" -> "待发送报文"
+            "queued_alerts" -> "待发送告警"
+            "sent_packets" -> "已发送报文"
+            "sent_alerts" -> "已发送告警"
+            "failed_batches" -> "失败批次"
+            "scenario" -> "场景"
+            "file" -> "文件"
+            "file_path" -> "文件路径"
+            "filename" -> "文件名"
+            "target_url" -> "目标服务器"
+            "provider" -> "服务提供方"
+            "session_id" -> "会话编号"
+            "response" -> "回复"
+            "content" -> "内容"
+            else -> key.replace("_", " ")
+        }
+    }
+
     private fun urlEncode(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     @Composable
     private fun GatewayGuardCarApp(state: CarUiState) {
+        val palette = paletteFor(state.themeMode)
         MaterialTheme(
             colorScheme = darkColorScheme(
-                background = Color(0xFF0E141C),
-                surface = Color(0xFF17212D),
-                primary = Color(0xFF35D0A5),
-                secondary = Color(0xFFFFC857),
-                tertiary = Color(0xFF7AA2FF),
-                onPrimary = Color(0xFF061915),
-                onSurface = Color(0xFFEAF2F8)
+                background = palette.background,
+                surface = palette.panel,
+                primary = palette.primary,
+                secondary = palette.secondary,
+                tertiary = palette.info,
+                onPrimary = palette.onAccent,
+                onSurface = palette.text
             )
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(Color(0xFF0E141C), Color(0xFF13233A), Color(0xFF101820))
-                        )
-                    )
+                    .background(palette.background)
                     .padding(16.dp)
             ) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -632,43 +916,60 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun NavigationColumn(state: CarUiState, modifier: Modifier = Modifier) {
+        val scroll = rememberScrollState()
+        val palette = paletteFor(state.themeMode)
+
         Surface(
             modifier = modifier,
             shape = RoundedCornerShape(8.dp),
-            color = Color(0xE617212D)
+            color = palette.panel
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(16.dp).verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "GatewayGuard",
-                    color = Color.White,
+                    color = palette.text,
                     fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "车机安全控制台",
-                    color = Color(0xFFB9C8D8),
-                    fontSize = 18.sp
-                )
-                StatusPill(state)
-                MetricTile("报文", state.packetCount, Color(0xFF35D0A5))
-                MetricTile("告警", state.alertCount, Color(0xFFFF6B6B))
-                Text(
-                    text = state.relayStatus,
-                    color = Color(0xFFB9C8D8),
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
-                    maxLines = 4,
+                    color = palette.muted,
+                    fontSize = 17.sp,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                NavButton("总览磁贴", CarPanel.Dashboard, state.activePanel)
+                StatusPill(state)
+                ActionButton(
+                    if (state.themeMode == ThemeMode.Night) "切换日间" else "切换夜间",
+                    true,
+                    Modifier.fillMaxWidth(),
+                    secondary = true
+                ) { toggleThemeMode() }
+                MetricTile("报文", state.packetCount, palette.primary, Modifier.fillMaxWidth())
+                MetricTile("告警", state.alertCount, palette.danger, Modifier.fillMaxWidth())
+                Surface(shape = RoundedCornerShape(8.dp), color = palette.panelAlt) {
+                    Text(
+                        text = state.relayStatus,
+                        color = palette.muted,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                NavButton("总览", CarPanel.Dashboard, state.activePanel)
+                NavButton("导入", CarPanel.Import, state.activePanel)
+                NavButton("告警", CarPanel.Alerts, state.activePanel)
                 NavButton("AI 助手", CarPanel.Assistant, state.activePanel)
                 NavButton("控制台", CarPanel.Console, state.activePanel)
                 NavButton("日志", CarPanel.Logs, state.activePanel)
-                NavButton("原 Web 面板", CarPanel.Web, state.activePanel)
             }
         }
     }
@@ -678,22 +979,30 @@ class MainActivity : ComponentActivity() {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 NavButton("总览", CarPanel.Dashboard, state.activePanel, Modifier.weight(1f))
-                NavButton("AI", CarPanel.Assistant, state.activePanel, Modifier.weight(1f))
-                NavButton("控制台", CarPanel.Console, state.activePanel, Modifier.weight(1f))
+                NavButton("导入", CarPanel.Import, state.activePanel, Modifier.weight(1f))
+                NavButton("告警", CarPanel.Alerts, state.activePanel, Modifier.weight(1f))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NavButton("AI", CarPanel.Assistant, state.activePanel, Modifier.weight(1f))
+                NavButton("控制台", CarPanel.Console, state.activePanel, Modifier.weight(1f))
                 NavButton("日志", CarPanel.Logs, state.activePanel, Modifier.weight(1f))
-                NavButton("Web", CarPanel.Web, state.activePanel, Modifier.weight(1f))
             }
         }
     }
 
     @Composable
     private fun TopHeader(state: CarUiState) {
-        Surface(shape = RoundedCornerShape(8.dp), color = Color(0xE617212D)) {
+        val palette = paletteFor(state.themeMode)
+        Surface(shape = RoundedCornerShape(8.dp), color = palette.panel) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("GatewayGuard 车机控制台", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text("GatewayGuard 车机控制台", color = palette.text, fontSize = 28.sp, fontWeight = FontWeight.SemiBold)
                 StatusPill(state)
+                ActionButton(
+                    if (state.themeMode == ThemeMode.Night) "切换日间" else "切换夜间",
+                    true,
+                    Modifier.fillMaxWidth(),
+                    secondary = true
+                ) { toggleThemeMode() }
             }
         }
     }
@@ -703,14 +1012,15 @@ class MainActivity : ComponentActivity() {
         Surface(
             modifier = modifier,
             shape = RoundedCornerShape(8.dp),
-            color = Color(0xCC111A24)
+            color = paletteFor(state.themeMode).panel
         ) {
             when (state.activePanel) {
                 CarPanel.Dashboard -> DashboardPanel(state, columns)
+                CarPanel.Import -> ImportPanel(state)
+                CarPanel.Alerts -> AlertsPanel(state)
                 CarPanel.Assistant -> AssistantPanel(state)
                 CarPanel.Console -> ConsolePanel(state, columns)
                 CarPanel.Logs -> LogsPanel(state)
-                CarPanel.Web -> WebPanel(state)
             }
         }
     }
@@ -718,42 +1028,62 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun DashboardPanel(state: CarUiState, columns: Int) {
         val scroll = rememberScrollState()
+        val palette = paletteFor(state.themeMode)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(scroll).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("触控磁贴", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "总览",
+                    color = palette.text,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                ActionButton("刷新状态", state.backendReady, Modifier.widthIn(min = 160.dp), secondary = true) {
+                    refreshOverview(true, CarPanel.Dashboard)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricTile("报文数量", state.packetCount, Color(0xFF35D0A5), Modifier.weight(1f))
-                MetricTile("告警数量", state.alertCount, Color(0xFFFF6B6B), Modifier.weight(1f))
-                MetricTile("后端", if (state.backendReady) "在线" else "启动中", Color(0xFF7AA2FF), Modifier.weight(1f))
+                MetricTile("报文数量", state.packetCount, palette.primary, Modifier.weight(1f))
+                MetricTile("告警数量", state.alertCount, palette.danger, Modifier.weight(1f))
+                MetricTile("后端状态", if (state.backendReady) "在线" else "启动中", palette.info, Modifier.weight(1f))
             }
             TileGrid(
                 columns = columns,
                 tiles = listOf(
-                    TileSpec("导入数据", "选择 PCAP、日志或抓包文件", Color(0xFF35D0A5), state.backendReady) { pickCaptureFile() },
-                    TileSpec("刷新状态", "更新报文、告警和 Relay", Color(0xFF7AA2FF), state.backendReady) { refreshOverview(true) },
-                    TileSpec("启动实时流量", "开启模拟采集器并同步", Color(0xFFFFC857), state.backendReady) { startRealtimeTraffic() },
-                    TileSpec("同步到服务器", "连接 $defaultRemoteUrl", Color(0xFF35D0A5), state.backendReady) { enableRelay() },
-                    TileSpec("AI 助手", "大字号对话分析", Color(0xFFB58CFF), true) {
-                        updateUi { it.copy(activePanel = CarPanel.Assistant) }
-                    },
-                    TileSpec("原 Web 面板", "保留旧版完整页面入口", Color(0xFF8AD8FF), state.backendReady) {
-                        updateUi { it.copy(activePanel = CarPanel.Web) }
-                        loadWebUiIfAvailable()
-                    }
+                    TileSpec("导入数据", "固定目录或系统选择器", palette.primary, state.backendReady) { showImportPanel() },
+                    TileSpec("生成模拟流量", "${state.scenario} / ${state.simulateCount.ifBlank { "120" }} 条", palette.secondary, state.backendReady) { simulateTraffic(CarPanel.Dashboard) },
+                    TileSpec("启动实时流量", "开启模拟采集器", palette.info, state.backendReady) { startRealtimeTraffic(CarPanel.Dashboard) },
+                    TileSpec("训练 AI", "使用最近流量训练检测器", palette.primary, state.backendReady) { trainDetector(CarPanel.Dashboard) },
+                    TileSpec("AI 检测", "扫描异常并刷新告警", palette.danger, state.backendReady) { detectAnomalies(CarPanel.Dashboard) },
+                    TileSpec("报警列表", "查看最近异常告警", palette.sync, state.backendReady) { showAlertsPanel() }
                 )
             )
-            ConfigPanel(state)
-            ResultSurface(state.resultTitle, state.resultBody)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ActionButton("打开 AI 助手", true, Modifier.weight(1f), secondary = true) {
+                    updateUi { it.copy(activePanel = CarPanel.Assistant) }
+                }
+                ActionButton("更多控制", state.backendReady, Modifier.weight(1f), secondary = true) {
+                    updateUi { it.copy(activePanel = CarPanel.Console) }
+                }
+            }
+            if (state.resultTitle.isNotBlank() || state.resultBody.isNotBlank()) {
+                ResultSurface(state.resultTitle, state.resultBody)
+            }
         }
     }
 
     @Composable
     private fun ConfigPanel(state: CarUiState) {
-        Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFF172636)) {
+        val palette = paletteFor(state.themeMode)
+        Surface(shape = RoundedCornerShape(8.dp), color = palette.panelAlt) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("连接配置", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("连接配置", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                 LargeTextField(
                     label = "OpenAI API Key",
                     value = state.apiKey,
@@ -785,12 +1115,152 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
+    private fun ImportPanel(state: CarUiState) {
+        val palette = paletteFor(state.themeMode)
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            PanelHeader("导入流量")
+            Surface(shape = RoundedCornerShape(8.dp), color = palette.panelAlt) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("固定目录", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        importsDir().absolutePath,
+                        color = palette.muted,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ActionButton("刷新列表", true, Modifier.weight(1f), secondary = true) { refreshImportFiles() }
+                        ActionButton("系统文件选择器", state.backendReady, Modifier.weight(1f), secondary = true) {
+                            pickCaptureFile(CarPanel.Import)
+                        }
+                    }
+                }
+            }
+            if (state.importFiles.isEmpty()) {
+                ResultSurface("导入目录暂无文件", "请将 PCAP、日志或抓包文件放入上方固定目录，或使用系统文件选择器。")
+            } else {
+                TileGrid(
+                    columns = 2,
+                    tiles = state.importFiles.map { file ->
+                        TileSpec(
+                            title = file.name,
+                            subtitle = "${file.sizeBytes / 1024} KB",
+                            accent = palette.info,
+                            enabled = state.backendReady
+                        ) { importFixedFile(file) }
+                    }
+                )
+            }
+            ResultSurface(state.resultTitle, state.resultBody)
+        }
+    }
+
+    @Composable
+    private fun AlertsPanel(state: CarUiState) {
+        val visibleAlerts = visibleAlerts(state)
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            PanelHeader("告警列表")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ActionButton("刷新告警", state.backendReady, Modifier.weight(1f), secondary = true) { loadAlerts() }
+                ActionButton("重新检测", state.backendReady, Modifier.weight(1f), danger = true) { detectAnomalies(CarPanel.Alerts) }
+            }
+            AlertControls(state, visibleAlerts.size)
+            if (state.alerts.isEmpty()) {
+                ResultSurface(
+                    state.resultTitle.ifBlank { "暂无告警" },
+                    state.resultBody.ifBlank { "当前没有异常告警。执行 AI 检测后，可在这里查看最近结果。" }
+                )
+            } else if (visibleAlerts.isEmpty()) {
+                ResultSurface("暂无匹配告警", "当前筛选条件下暂无告警。")
+            } else {
+                visibleAlerts.forEach { alert ->
+                    AlertCard(alert)
+                }
+            }
+            if (state.alerts.isNotEmpty() && (state.resultTitle.isNotBlank() || state.resultBody.isNotBlank())) {
+                ResultSurface(state.resultTitle, state.resultBody)
+            }
+        }
+    }
+
+    @Composable
+    private fun AlertControls(state: CarUiState, visibleCount: Int) {
+        val palette = paletteFor(state.themeMode)
+        Surface(shape = RoundedCornerShape(8.dp), color = palette.panelAlt) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("当前显示：$visibleCount 条", color = palette.muted, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AlertFilterButton("全部", AlertFilter.All, state.alertFilter, Modifier.weight(1f))
+                    AlertFilterButton("高风险", AlertFilter.High, state.alertFilter, Modifier.weight(1f))
+                    AlertFilterButton("中风险", AlertFilter.Medium, state.alertFilter, Modifier.weight(1f))
+                    AlertFilterButton("低风险", AlertFilter.Low, state.alertFilter, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AlertSortButton("时间优先", AlertSort.Time, state.alertSort, Modifier.weight(1f))
+                    AlertSortButton("风险优先", AlertSort.Risk, state.alertSort, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun AlertFilterButton(label: String, filter: AlertFilter, current: AlertFilter, modifier: Modifier = Modifier) {
+        ActionButton(label, true, modifier, secondary = filter != current) {
+            updateUi { it.copy(alertFilter = filter) }
+        }
+    }
+
+    @Composable
+    private fun AlertSortButton(label: String, sort: AlertSort, current: AlertSort, modifier: Modifier = Modifier) {
+        ActionButton(label, true, modifier, secondary = sort != current) {
+            updateUi { it.copy(alertSort = sort) }
+        }
+    }
+
+    @Composable
+    private fun AlertCard(alert: AlertItem) {
+        val palette = paletteFor(uiState.themeMode)
+        Surface(shape = RoundedCornerShape(8.dp), color = palette.tile) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.width(6.dp).height(84.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = palette.danger.copy(alpha = 0.86f)
+                ) {}
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(alert.severity, color = palette.danger, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Text(alert.status, color = palette.muted, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Text(alert.type, color = palette.text, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                    Text("来源：${alert.source}", color = palette.muted, fontSize = 16.sp, lineHeight = 22.sp)
+                    Text("时间：${alert.time}", color = palette.muted, fontSize = 16.sp, lineHeight = 22.sp)
+                    alert.count?.let {
+                        Text("关联报文：$it 条", color = palette.secondary, fontSize = 16.sp, lineHeight = 22.sp)
+                    }
+                    Text(alert.description, color = palette.text, fontSize = 16.sp, lineHeight = 23.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun AssistantPanel(state: CarUiState) {
         Column(
             modifier = Modifier.fillMaxSize().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("AI 助手", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            PanelHeader("AI 助手")
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -817,21 +1287,23 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ConsolePanel(state: CarUiState, columns: Int) {
+        val palette = paletteFor(state.themeMode)
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("控制台磁贴", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            PanelHeader("控制台")
+            ConfigPanel(state)
             ScenarioPanel(state)
             TileGrid(
                 columns = columns,
                 tiles = listOf(
-                    TileSpec("生成模拟流量", "按当前场景生成报文", Color(0xFFFFC857), state.backendReady) { simulateTraffic() },
-                    TileSpec("训练 AI", "使用最近流量训练检测器", Color(0xFF35D0A5), state.backendReady) { trainDetector() },
-                    TileSpec("AI 检测流量", "扫描并输出异常事件", Color(0xFFFF6B6B), state.backendReady) { detectAnomalies() },
-                    TileSpec("流量统计", "查看报文汇总数据", Color(0xFF7AA2FF), state.backendReady) { showTrafficStats() },
-                    TileSpec("实时状态", "查看采集器运行状态", Color(0xFF8AD8FF), state.backendReady) { showRealtimeStatus() },
-                    TileSpec("Relay 状态", "查看服务器中转队列", Color(0xFFB58CFF), state.backendReady) { showRelayStatus() }
+                    TileSpec("生成模拟流量", "按当前场景生成报文", palette.secondary, state.backendReady) { simulateTraffic() },
+                    TileSpec("训练 AI", "使用最近流量训练检测器", palette.primary, state.backendReady) { trainDetector() },
+                    TileSpec("AI 检测流量", "扫描并输出异常事件", palette.danger, state.backendReady) { detectAnomalies() },
+                    TileSpec("流量统计", "查看报文汇总数据", palette.info, state.backendReady) { showTrafficStats() },
+                    TileSpec("实时状态", "查看采集器运行状态", palette.info, state.backendReady) { showRealtimeStatus() },
+                    TileSpec("Relay 状态", "查看服务器中转队列", palette.sync, state.backendReady) { showRelayStatus() }
                 )
             )
             ResultSurface(state.resultTitle, state.resultBody)
@@ -840,16 +1312,17 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ScenarioPanel(state: CarUiState) {
-        Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFF172636)) {
+        val palette = paletteFor(state.themeMode)
+        Surface(shape = RoundedCornerShape(8.dp), color = palette.panelAlt) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("模拟参数", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("模拟参数", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                 TileGrid(
                     columns = 3,
                     tiles = listOf("normal", "dos", "fuzzy", "spoofing", "mixed").map { scenario ->
                         TileSpec(
                             title = scenario,
                             subtitle = if (state.scenario == scenario) "已选择" else "点击选择",
-                            accent = if (state.scenario == scenario) Color(0xFF35D0A5) else Color(0xFF4D6075),
+                            accent = if (state.scenario == scenario) palette.primary else palette.buttonSecondary,
                             enabled = true
                         ) {
                             updateUi { it.copy(scenario = scenario) }
@@ -871,7 +1344,7 @@ class MainActivity : ComponentActivity() {
             modifier = Modifier.fillMaxSize().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("日志", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+            PanelHeader("日志")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionButton("加载最近日志", state.backendReady, Modifier.weight(1f)) { showLogs() }
                 ActionButton("系统状态", state.backendReady, Modifier.weight(1f), secondary = true) { showSystemStatus() }
@@ -881,53 +1354,9 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun WebPanel(state: CarUiState) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "原 Web 面板",
-                    color = Color.White,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton("返回磁贴", true, Modifier.widthIn(min = 150.dp), secondary = true) {
-                    updateUi { it.copy(activePanel = CarPanel.Dashboard) }
-                }
-                ActionButton("刷新 Web", state.backendReady, Modifier.widthIn(min = 150.dp)) {
-                    webView?.reload() ?: loadWebUiIfAvailable()
-                }
-            }
-            Surface(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                color = Color.Black
-            ) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        WebView(context).also { view ->
-                            webView = view
-                            configureWebView(view)
-                            if (state.backendReady) view.loadUrl("$backendUrl/ui/")
-                        }
-                    },
-                    update = { view ->
-                        if (state.backendReady && view.url.isNullOrBlank()) {
-                            view.loadUrl("$backendUrl/ui/")
-                        }
-                    }
-                )
-            }
-        }
-    }
-
-    @Composable
     private fun StatusPill(state: CarUiState) {
-        val color = if (state.backendReady) Color(0xFF35D0A5) else Color(0xFFFFC857)
+        val palette = paletteFor(state.themeMode)
+        val color = if (state.backendReady) palette.primary else palette.secondary
         Surface(shape = RoundedCornerShape(8.dp), color = color.copy(alpha = 0.16f)) {
             Text(
                 text = state.backendStatus,
@@ -943,33 +1372,52 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun MetricTile(label: String, value: String, accent: Color, modifier: Modifier = Modifier) {
-        Surface(modifier = modifier.heightIn(min = 98.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFF172636)) {
+        val palette = paletteFor(uiState.themeMode)
+        Surface(modifier = modifier.heightIn(min = 104.dp), shape = RoundedCornerShape(8.dp), color = palette.tile) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(label, color = Color(0xFFB9C8D8), fontSize = 16.sp)
-                Text(value, color = accent, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(
+                    label,
+                    color = palette.muted,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    value,
+                    color = accent,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
 
     @Composable
     private fun NavButton(label: String, panel: CarPanel, active: CarPanel, modifier: Modifier = Modifier) {
+        val palette = paletteFor(uiState.themeMode)
         val selected = panel == active
         Button(
             onClick = {
-                updateUi { it.copy(activePanel = panel) }
-                if (panel == CarPanel.Web) loadWebUiIfAvailable()
+                if (panel == CarPanel.Alerts) {
+                    showAlertsPanel()
+                } else {
+                    updateUi { it.copy(activePanel = panel) }
+                }
             },
             modifier = modifier.fillMaxWidth().heightIn(min = 64.dp),
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (selected) Color(0xFF35D0A5) else Color(0xFF26384A),
-                contentColor = if (selected) Color(0xFF061915) else Color.White
+                containerColor = if (selected) palette.primary else palette.buttonSecondary,
+                contentColor = if (selected) palette.onAccent else palette.text
             )
         ) {
-            Text(label, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(label, fontSize = 18.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
         }
     }
 
@@ -992,6 +1440,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun ActionTile(tile: TileSpec, modifier: Modifier = Modifier) {
+        val palette = paletteFor(uiState.themeMode)
+        val tileContainer = if (uiState.themeMode == ThemeMode.Day) {
+            palette.tile
+        } else {
+            palette.tileSoft
+        }
+        val titleColor = if (tile.enabled) palette.text else palette.buttonDisabledText
+        val subtitleColor = if (tile.enabled) tile.accent else palette.buttonDisabledText
         Button(
             onClick = tile.onClick,
             enabled = tile.enabled,
@@ -999,15 +1455,41 @@ class MainActivity : ComponentActivity() {
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = tile.accent.copy(alpha = 0.92f),
-                contentColor = Color(0xFF061019),
-                disabledContainerColor = Color(0xFF253344),
-                disabledContentColor = Color(0xFF8292A3)
+                containerColor = tileContainer,
+                contentColor = palette.text,
+                disabledContainerColor = palette.buttonDisabled,
+                disabledContentColor = palette.buttonDisabledText
             )
         ) {
-            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tile.title, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(tile.subtitle, fontSize = 15.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.width(6.dp).height(52.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (tile.enabled) tile.accent.copy(alpha = 0.82f) else palette.buttonDisabledText.copy(alpha = 0.45f)
+                ) {}
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        tile.title,
+                        color = titleColor,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        tile.subtitle,
+                        color = subtitleColor,
+                        fontSize = 15.sp,
+                        lineHeight = 21.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -1021,10 +1503,11 @@ class MainActivity : ComponentActivity() {
         danger: Boolean = false,
         onClick: () -> Unit
     ) {
+        val palette = paletteFor(uiState.themeMode)
         val color = when {
-            danger -> Color(0xFFFF6B6B)
-            secondary -> Color(0xFF4D6075)
-            else -> Color(0xFF35D0A5)
+            danger -> palette.danger
+            secondary -> palette.buttonSecondary
+            else -> palette.primary
         }
         Button(
             onClick = onClick,
@@ -1033,12 +1516,29 @@ class MainActivity : ComponentActivity() {
             shape = RoundedCornerShape(8.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = color,
-                contentColor = if (secondary) Color.White else Color(0xFF061915),
-                disabledContainerColor = Color(0xFF253344),
-                disabledContentColor = Color(0xFF8292A3)
+                contentColor = if (secondary) palette.text else palette.onAccent,
+                disabledContainerColor = palette.buttonDisabled,
+                disabledContentColor = palette.buttonDisabledText
             )
         ) {
-            Text(label, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+
+    @Composable
+    private fun PanelHeader(title: String) {
+        val palette = paletteFor(uiState.themeMode)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                color = palette.text,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            ActionButton("返回总览", true, Modifier.widthIn(min = 150.dp), secondary = true) { returnToDashboard() }
         }
     }
 
@@ -1067,66 +1567,77 @@ class MainActivity : ComponentActivity() {
         modifier: Modifier = Modifier,
         scrollable: Boolean = false
     ) {
+        if (title.isBlank() && body.isBlank()) return
+
+        val lines = body.lines()
+        val summary = lines.firstOrNull().orEmpty()
+        val detail = lines.drop(1).joinToString("\n").trim()
         val contentModifier = if (scrollable) {
             Modifier.padding(16.dp).verticalScroll(rememberScrollState())
         } else {
             Modifier.padding(16.dp)
         }
+        val palette = paletteFor(uiState.themeMode)
         Surface(
             modifier = modifier.fillMaxWidth().heightIn(min = 180.dp),
             shape = RoundedCornerShape(8.dp),
-            color = Color(0xFF172636)
+            color = palette.panelAlt
         ) {
             Column(
                 modifier = contentModifier,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    body,
-                    color = Color(0xFFD7E4EF),
-                    fontSize = 17.sp,
-                    lineHeight = 24.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+                Text(title, color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                if (summary.isNotBlank()) {
+                    Text(
+                        summary,
+                        color = palette.primary,
+                        fontSize = 20.sp,
+                        lineHeight = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (detail.isNotBlank()) {
+                    Text(
+                        detail,
+                        color = palette.text,
+                        fontSize = 16.sp,
+                        lineHeight = 24.sp
+                    )
+                }
             }
         }
     }
 
     @Composable
     private fun ChatBubble(message: ChatMessage) {
+        val palette = paletteFor(uiState.themeMode)
         val isUser = message.role == "user"
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            color = if (isUser) Color(0xFF214D48) else Color(0xFF172636)
+            color = if (isUser) palette.primary.copy(alpha = 0.22f) else palette.panelAlt
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     if (isUser) "分析员" else "AI 助手",
-                    color = if (isUser) Color(0xFF35D0A5) else Color(0xFF8AD8FF),
+                    color = if (isUser) palette.primary else palette.info,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(message.content, color = Color.White, fontSize = 19.sp, lineHeight = 28.sp)
+                Text(message.content, color = palette.text, fontSize = 19.sp, lineHeight = 28.sp)
             }
-        }
-    }
-
-    class AndroidBridge(private val activity: MainActivity) {
-        @JavascriptInterface
-        fun pickCaptureFile() {
-            activity.runOnUiThread { activity.pickCaptureFile() }
         }
     }
 }
 
 private enum class CarPanel {
     Dashboard,
+    Import,
+    Alerts,
     Assistant,
     Console,
-    Logs,
-    Web
+    Logs
 }
 
 private data class ChatMessage(
@@ -1142,6 +1653,101 @@ private data class TileSpec(
     val onClick: () -> Unit
 )
 
+private data class ImportFile(
+    val name: String,
+    val path: String,
+    val sizeBytes: Long
+)
+
+private data class AlertItem(
+    val severity: String,
+    val severityRank: Int,
+    val type: String,
+    val source: String,
+    val time: String,
+    val timestamp: String,
+    val description: String,
+    val status: String,
+    val count: Long?
+)
+
+private enum class AlertFilter {
+    All,
+    High,
+    Medium,
+    Low
+}
+
+private enum class AlertSort {
+    Time,
+    Risk
+}
+
+private enum class ThemeMode {
+    Night,
+    Day
+}
+
+private data class CarPalette(
+    val background: Color,
+    val panel: Color,
+    val panelAlt: Color,
+    val tile: Color,
+    val tileSoft: Color,
+    val text: Color,
+    val muted: Color,
+    val primary: Color,
+    val secondary: Color,
+    val info: Color,
+    val danger: Color,
+    val sync: Color,
+    val buttonSecondary: Color,
+    val buttonDisabled: Color,
+    val buttonDisabledText: Color,
+    val onAccent: Color
+)
+
+private fun paletteFor(mode: ThemeMode): CarPalette {
+    return when (mode) {
+        ThemeMode.Night -> CarPalette(
+            background = Color(0xFF101820),
+            panel = Color(0xFF172330),
+            panelAlt = Color(0xFF203040),
+            tile = Color(0xFF223243),
+            tileSoft = Color(0xFF263848),
+            text = Color(0xFFE7EEF4),
+            muted = Color(0xFFB2C0CC),
+            primary = Color(0xFF54C6A3),
+            secondary = Color(0xFFE2B85B),
+            info = Color(0xFF84A7D8),
+            danger = Color(0xFFE07076),
+            sync = Color(0xFFA9A0E8),
+            buttonSecondary = Color(0xFF46596A),
+            buttonDisabled = Color(0xFF2D3A46),
+            buttonDisabledText = Color(0xFF8795A1),
+            onAccent = Color(0xFF071512)
+        )
+        ThemeMode.Day -> CarPalette(
+            background = Color(0xFFE9EEF3),
+            panel = Color(0xFFFFFFFF),
+            panelAlt = Color(0xFFF4F7FA),
+            tile = Color(0xFFF9FBFC),
+            tileSoft = Color(0xFFEFF4F7),
+            text = Color(0xFF18232D),
+            muted = Color(0xFF5F6F7D),
+            primary = Color(0xFF2E8F75),
+            secondary = Color(0xFFC29132),
+            info = Color(0xFF4F78A8),
+            danger = Color(0xFFC85F66),
+            sync = Color(0xFF7468B6),
+            buttonSecondary = Color(0xFFD8E1EA),
+            buttonDisabled = Color(0xFFE1E7ED),
+            buttonDisabledText = Color(0xFF84919C),
+            onAccent = Color(0xFFFFFFFF)
+        )
+    }
+}
+
 private data class CarUiState(
     val backendStatus: String = "正在启动后端...",
     val backendReady: Boolean = false,
@@ -1151,9 +1757,14 @@ private data class CarUiState(
     val apiKey: String = "",
     val packetCount: String = "0",
     val alertCount: String = "0",
-    val resultTitle: String = "等待操作",
-    val resultBody: String = "大屏磁贴界面已加载。后端启动完成后，可以直接触控磁贴执行导入、检测、同步和 AI 分析。",
+    val resultTitle: String = "",
+    val resultBody: String = "",
     val activePanel: CarPanel = CarPanel.Dashboard,
+    val importFiles: List<ImportFile> = emptyList(),
+    val alerts: List<AlertItem> = emptyList(),
+    val alertFilter: AlertFilter = AlertFilter.All,
+    val alertSort: AlertSort = AlertSort.Time,
+    val themeMode: ThemeMode = ThemeMode.Night,
     val scenario: String = "normal",
     val simulateCount: String = "120",
     val chatInput: String = "",

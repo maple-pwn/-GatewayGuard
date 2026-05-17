@@ -75,11 +75,18 @@ chaquopy {
                 ?: System.getenv("CHAQUOPY_VERSION")
                 ?: "3.10").toString()
         version = chaquopyVersion
-        def hostPython = project.findProperty("chaquopy.python") ?: System.getenv("CHAQUOPY_PYTHON")
-        if (hostPython != null && !hostPython.toString().trim().isEmpty()) {
-            buildPython(hostPython.toString())
+        def configuredHostPython = project.findProperty("chaquopy.python") ?: System.getenv("CHAQUOPY_PYTHON")
+        def localAppData = System.getenv("LOCALAPPDATA")
+        def windowsPython310 = localAppData != null
+                ? new File(localAppData, "Programs/Python/Python310/python.exe")
+                : null
+
+        if (configuredHostPython != null && !configuredHostPython.toString().trim().isEmpty()) {
+            buildPython(configuredHostPython.toString())
+        } else if (windowsPython310 != null && windowsPython310.exists()) {
+            buildPython(windowsPython310.absolutePath)
         } else {
-            buildPython("python")
+            buildPython("python3.10")
         }
         pip {
             install("-r", "../../backend/requirements-android.txt")
