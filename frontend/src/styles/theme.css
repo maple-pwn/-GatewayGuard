@@ -506,6 +506,55 @@ a {
   --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.05);
 }
 
+.shell--immersive .table-card .el-table td.el-table__cell {
+  background-color: transparent !important;
+}
+
+.shell--immersive .table-card .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.table-card .el-table .traffic-table-row td.el-table__cell {
+  transition:
+    background-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.table-card .el-table .traffic-table-row:hover td.el-table__cell {
+  transform: scale(1.015);
+  box-shadow: 0 10px 22px rgba(42, 91, 180, 0.12);
+  position: relative;
+  z-index: 1;
+}
+
+.traffic-export-btn.el-button {
+  color: #51647f;
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(122, 141, 166, 0.28);
+  box-shadow: none;
+}
+
+.traffic-export-btn.el-button:hover,
+.traffic-export-btn.el-button:focus {
+  color: #2f58b8;
+  background: rgba(238, 244, 255, 0.84);
+  border-color: rgba(78, 112, 190, 0.34);
+}
+
+.shell--immersive .traffic-export-btn.el-button {
+  color: #c8d8ef;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.shell--immersive .traffic-export-btn.el-button:hover,
+.shell--immersive .traffic-export-btn.el-button:focus {
+  color: #edf4ff;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(148, 199, 255, 0.28);
+}
+
 .shell--immersive .el-button--default,
 .shell--immersive .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger) {
   color: #edf3ff;

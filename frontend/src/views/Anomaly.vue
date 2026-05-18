@@ -33,12 +33,92 @@
       </el-row>
     </section>
 
+    <section class="section-block situation-grid" v-loading="summaryLoading">
+      <el-card class="panel-card situation-card situation-card--risk">
+        <div class="situation-card__head">
+          <div>
+            <div class="situation-card__eyebrow">Risk Posture</div>
+            <div class="situation-card__title">风险态势</div>
+          </div>
+          <el-tag :type="riskTagType(chartData.riskLabel.toLowerCase())" effect="dark">
+            {{ chartData.riskLabel }}
+          </el-tag>
+        </div>
+        <VChart class="situation-gauge" :option="riskGaugeOption" autoresize />
+        <div class="situation-hint">{{ chartData.riskHint }}</div>
+      </el-card>
+
+      <el-card class="panel-card situation-card situation-card--trend">
+        <div class="situation-card__head">
+          <div>
+            <div class="situation-card__eyebrow">Event Trend</div>
+            <div class="situation-card__title">事件趋势</div>
+          </div>
+          <span class="situation-card__meta">最近一小时 / 按分钟聚合</span>
+        </div>
+        <VChart class="situation-chart situation-chart--large" :option="trendOption" autoresize />
+      </el-card>
+
+      <el-card class="panel-card situation-card situation-card--advice">
+        <div class="situation-card__eyebrow">AI Triage</div>
+        <div class="situation-card__title">处置优先级</div>
+        <div class="triage-list">
+          <div class="triage-item triage-item--critical">
+            <span>高危优先</span>
+            <strong>{{ highRiskCount }}</strong>
+          </div>
+          <div class="triage-item triage-item--open">
+            <span>待调查</span>
+            <strong>{{ openCount }}</strong>
+          </div>
+          <div class="triage-item triage-item--ai">
+            <span>AI 分析队列</span>
+            <strong>{{ Math.min(events.length, 5) }}</strong>
+          </div>
+        </div>
+        <div class="situation-hint">建议优先分析高危和调查中的 CAN / 网关侧异常。</div>
+      </el-card>
+    </section>
+
+    <section class="section-block chart-grid" v-loading="summaryLoading">
+      <el-card class="panel-card chart-card">
+        <div class="situation-card__head">
+          <div>
+            <div class="situation-card__eyebrow">Severity Mix</div>
+            <div class="situation-card__title">严重程度占比</div>
+          </div>
+        </div>
+        <VChart class="situation-chart" :option="severityPieOption" autoresize />
+      </el-card>
+
+      <el-card class="panel-card chart-card">
+        <div class="situation-card__head">
+          <div>
+            <div class="situation-card__eyebrow">Protocol Domain</div>
+            <div class="situation-card__title">协议域分布</div>
+          </div>
+        </div>
+        <VChart class="situation-chart" :option="protocolBarOption" autoresize />
+      </el-card>
+
+      <el-card class="panel-card chart-card">
+        <div class="situation-card__head">
+          <div>
+            <div class="situation-card__eyebrow">Attack Topology</div>
+            <div class="situation-card__title">攻击类型 Top 5</div>
+          </div>
+        </div>
+        <VChart class="situation-chart" :option="typeBarOption" autoresize />
+      </el-card>
+    </section>
+
     <section class="section-block events-grid">
       <el-card class="panel-card">
         <div class="filter-grid">
           <div class="filter-field">
             <label>严重程度</label>
-            <el-select v-model="filter.severity" placeholder="严重程度" clearable>
+            <el-select v-model="filter.severity" placeholder="严重程度">
+              <el-option label="全部" value="all" />
               <el-option label="严重" value="critical" />
               <el-option label="高" value="high" />
               <el-option label="中" value="medium" />
@@ -54,7 +134,12 @@
             </el-select>
           </div>
           <div class="filter-action">
-            <el-button type="primary" class="ai-action-btn ai-action-btn--query" @click="loadEvents">
+            <el-button
+              type="primary"
+              class="ai-action-btn ai-action-btn--query"
+              :loading="eventsLoading || summaryLoading"
+              @click="loadPageData"
+            >
               查询事件
             </el-button>
           </div>
@@ -96,7 +181,7 @@
         </div>
       </div>
 
-      <el-card class="panel-card table-card">
+      <el-card class="panel-card table-card" v-loading="eventsLoading">
         <el-table :data="events" stripe style="width: 100%" max-height="560">
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column prop="anomaly_type" label="类型" width="180" />
@@ -259,13 +344,32 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { BarChart, GaugeChart, LineChart, PieChart } from 'echarts/charts'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
+import VChart from 'vue-echarts'
 import { Loading, SuccessFilled } from '@element-plus/icons-vue'
 import { anomalyApi, llmApi } from '../api/index.js'
 import { ElMessage } from 'element-plus'
+import { buildEventChartData } from '../utils/eventCharts.js'
 
+use([
+  CanvasRenderer,
+  BarChart,
+  GaugeChart,
+  LineChart,
+  PieChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+])
+
+const route = useRoute()
 const events = ref([])
 const total = ref(0)
-const filter = ref({ severity: '', status: '' })
+const filter = ref({ severity: 'all', status: '' })
 const reportLoading = ref(false)
 const showAnalysis = ref(false)
 const analysisLoading = ref(false)
@@ -274,13 +378,12 @@ const batchLoading = ref(false)
 const showReport = ref(false)
 const reportResult = ref(null)
 
-const highRiskCount = computed(() => (
-  events.value.filter((item) => item.severity === 'critical' || item.severity === 'high').length
-))
-
-const openCount = computed(() => (
-  events.value.filter((item) => item.status === 'open' || item.status === 'investigating').length
-))
+const isImmersive = computed(() => route.meta.shell === 'immersive')
+const chartData = ref(buildEventChartData([]))
+const highRiskCount = ref(0)
+const openCount = ref(0)
+const eventsLoading = ref(false)
+const summaryLoading = ref(false)
 
 function severityColor(s) {
   return { critical: 'danger', high: 'danger', medium: 'warning', low: 'info' }[s] || 'info'
@@ -307,17 +410,216 @@ function riskLabel(level) {
   return { critical: '严重', high: '高危', medium: '中危', low: '低危' }[level] || level
 }
 
+const chartTextColor = computed(() => (isImmersive.value ? '#dce8fb' : '#51647f'))
+const chartSplitColor = computed(() => (isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7'))
+
+const riskGaugeOption = computed(() => ({
+  backgroundColor: 'transparent',
+  series: [
+    {
+      type: 'gauge',
+      radius: '92%',
+      startAngle: 210,
+      endAngle: -30,
+      min: 0,
+      max: 100,
+      progress: {
+        show: true,
+        width: 12,
+        itemStyle: { color: chartData.value.riskScore >= 70 ? '#ff6678' : chartData.value.riskScore >= 45 ? '#ffc65c' : '#58d8c4' },
+      },
+      axisLine: {
+        lineStyle: {
+          width: 12,
+          color: [[1, isImmersive.value ? 'rgba(255,255,255,0.08)' : '#e7edf6']],
+        },
+      },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      pointer: { show: false },
+      anchor: { show: false },
+      detail: {
+        valueAnimation: true,
+        formatter: '{value}',
+        color: isImmersive.value ? '#f5f9ff' : '#1f2d3d',
+        fontSize: 30,
+        fontWeight: 800,
+        offsetCenter: [0, '-2%'],
+      },
+      title: {
+        show: true,
+        offsetCenter: [0, '32%'],
+        color: chartTextColor.value,
+        fontSize: 12,
+      },
+      data: [{ value: chartData.value.riskScore, name: 'Risk Score' }],
+    },
+  ],
+}))
+
+const trendOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis' },
+  legend: {
+    top: 0,
+    right: 0,
+    textStyle: { color: chartTextColor.value },
+  },
+  grid: { left: 36, right: 22, top: 42, bottom: 28 },
+  xAxis: {
+    type: 'category',
+    data: chartData.value.trend.map((item) => item.name),
+    axisLabel: { color: chartTextColor.value },
+    axisLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  yAxis: {
+    type: 'value',
+    minInterval: 1,
+    axisLabel: { color: chartTextColor.value },
+    splitLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  series: [
+    {
+      name: '事件总量',
+      type: 'line',
+      smooth: true,
+      symbolSize: 7,
+      areaStyle: { color: 'rgba(86, 184, 255, 0.16)' },
+      lineStyle: { width: 3, color: '#5dd7ff' },
+      itemStyle: { color: '#5dd7ff' },
+      data: chartData.value.trend.map((item) => item.total),
+    },
+    {
+      name: '高危事件',
+      type: 'line',
+      smooth: true,
+      symbolSize: 7,
+      lineStyle: { width: 3, color: '#ff6678' },
+      itemStyle: { color: '#ff6678' },
+      data: chartData.value.trend.map((item) => item.highRisk),
+    },
+  ],
+}))
+
+const severityPieOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'item' },
+  legend: {
+    bottom: 0,
+    textStyle: { color: chartTextColor.value },
+  },
+  color: ['#ff6678', '#ff9f5f', '#ffc65c', '#58d8c4'],
+  series: [
+    {
+      type: 'pie',
+      radius: ['48%', '72%'],
+      center: ['50%', '44%'],
+      avoidLabelOverlap: true,
+      label: { color: chartTextColor.value, formatter: '{b}: {c}' },
+      data: chartData.value.severity,
+    },
+  ],
+}))
+
+const protocolBarOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis' },
+  grid: { left: 34, right: 16, top: 24, bottom: 30 },
+  xAxis: {
+    type: 'category',
+    data: chartData.value.protocol.map((item) => item.name),
+    axisLabel: { color: chartTextColor.value },
+    axisLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  yAxis: {
+    type: 'value',
+    minInterval: 1,
+    axisLabel: { color: chartTextColor.value },
+    splitLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  series: [
+    {
+      type: 'bar',
+      barWidth: 22,
+      data: chartData.value.protocol.map((item) => item.value),
+      itemStyle: {
+        borderRadius: [8, 8, 0, 0],
+        color: '#5dd7ff',
+      },
+    },
+  ],
+}))
+
+const typeBarOption = computed(() => ({
+  backgroundColor: 'transparent',
+  tooltip: { trigger: 'axis' },
+  grid: { left: 86, right: 16, top: 24, bottom: 24 },
+  xAxis: {
+    type: 'value',
+    minInterval: 1,
+    axisLabel: { color: chartTextColor.value },
+    splitLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  yAxis: {
+    type: 'category',
+    data: chartData.value.typeTop.map((item) => item.name).reverse(),
+    axisLabel: { color: chartTextColor.value },
+    axisLine: { lineStyle: { color: chartSplitColor.value } },
+  },
+  series: [
+    {
+      type: 'bar',
+      barWidth: 16,
+      data: chartData.value.typeTop.map((item) => item.value).reverse(),
+      itemStyle: {
+        borderRadius: [0, 8, 8, 0],
+        color: '#58d8c4',
+      },
+    },
+  ],
+}))
+
+function buildQueryParams() {
+  const params = {}
+  if (filter.value.severity && filter.value.severity !== 'all') {
+    params.severity = filter.value.severity
+  }
+  if (filter.value.status) params.status = filter.value.status
+  return params
+}
+
 async function loadEvents() {
+  eventsLoading.value = true
   try {
-    const params = {}
-    if (filter.value.severity) params.severity = filter.value.severity
-    if (filter.value.status) params.status = filter.value.status
+    const params = { ...buildQueryParams(), limit: 50 }
     const res = await anomalyApi.getEvents(params)
     events.value = res.data.events
     total.value = res.data.total
   } catch (e) {
     console.error(e)
+  } finally {
+    eventsLoading.value = false
   }
+}
+
+async function loadSummary() {
+  summaryLoading.value = true
+  try {
+    const res = await anomalyApi.getSummary({ ...buildQueryParams(), window_minutes: 60 })
+    chartData.value = res.data
+    total.value = res.data.total
+    highRiskCount.value = res.data.high_risk_count || 0
+    openCount.value = res.data.open_count || 0
+  } catch (e) {
+    console.error(e)
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+async function loadPageData() {
+  await Promise.all([loadEvents(), loadSummary()])
 }
 
 async function analyzeEvent(row) {
@@ -369,7 +671,7 @@ async function batchAnalyze() {
   ElMessage.info(`批量分析完成: 成功 ${success}, 失败 ${fail}`)
 }
 
-onMounted(loadEvents)
+onMounted(loadPageData)
 </script>
 
 <style scoped>
@@ -377,6 +679,162 @@ onMounted(loadEvents)
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   gap: 18px;
+}
+
+.situation-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(420px, 1.55fr) minmax(260px, 0.82fr);
+  gap: 18px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.situation-card,
+.chart-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.situation-card::before,
+.chart-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(93, 215, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 44%);
+}
+
+.situation-card :deep(.el-card__body),
+.chart-card :deep(.el-card__body) {
+  position: relative;
+  z-index: 1;
+}
+
+.situation-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.situation-card__eyebrow {
+  color: #76c9ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.situation-card__title {
+  margin-top: 5px;
+  color: var(--gg-text-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.situation-card__meta,
+.situation-hint {
+  color: var(--gg-text-soft);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.situation-gauge {
+  height: 190px;
+}
+
+.situation-chart {
+  height: 240px;
+}
+
+.situation-chart--large {
+  height: 260px;
+}
+
+.triage-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.triage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--gg-line);
+  background: var(--gg-surface-soft);
+}
+
+.triage-item span {
+  color: var(--gg-text-soft);
+  font-size: 13px;
+}
+
+.triage-item strong {
+  color: var(--gg-text-strong);
+  font-size: 26px;
+  font-weight: 900;
+}
+
+:global(.shell--immersive) .triage-item strong {
+  color: #ffffff;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.32);
+}
+
+:global(.shell--immersive) .triage-item span {
+  color: rgba(204, 224, 252, 0.82);
+}
+
+.triage-item--critical {
+  border-color: rgba(255, 102, 120, 0.26);
+  background: rgba(255, 102, 120, 0.08);
+}
+
+.triage-item--critical strong {
+  color: #ff405c;
+}
+
+:global(.shell--immersive) .triage-item--critical strong {
+  color: #ff6f84;
+  text-shadow: 0 0 18px rgba(255, 74, 104, 0.42);
+}
+
+.triage-item--open {
+  border-color: rgba(255, 198, 92, 0.24);
+  background: rgba(255, 198, 92, 0.08);
+}
+
+.triage-item--open strong {
+  color: #c77900;
+}
+
+:global(.shell--immersive) .triage-item--open strong {
+  color: #ffd36e;
+  text-shadow: 0 0 18px rgba(255, 199, 84, 0.38);
+}
+
+.triage-item--ai {
+  border-color: rgba(88, 216, 196, 0.24);
+  background: rgba(88, 216, 196, 0.08);
+}
+
+.triage-item--ai strong {
+  color: #008f82;
+}
+
+:global(.shell--immersive) .triage-item--ai strong {
+  color: #55f1df;
+  text-shadow: 0 0 18px rgba(85, 241, 223, 0.36);
 }
 
 .panel-header__title {
@@ -503,6 +961,8 @@ onMounted(loadEvents)
 }
 
 @media (max-width: 1080px) {
+  .situation-grid,
+  .chart-grid,
   .events-grid,
   .filter-grid {
     grid-template-columns: 1fr;

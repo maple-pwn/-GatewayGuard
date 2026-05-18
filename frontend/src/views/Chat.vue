@@ -71,11 +71,59 @@ import { Loading } from '@element-plus/icons-vue'
 import { anomalyApi, llmApi, trafficApi } from '../api/index.js'
 
 const route = useRoute()
+const CHAT_SESSION_STORAGE_KEY = 'gatewayGuardChatSessionId'
+const CHAT_MESSAGES_STORAGE_KEY = 'gatewayGuardChatMessages'
+
+function randomSessionId() {
+  return Math.random().toString(36).slice(2, 10)
+}
+
+function getStoredSessionId() {
+  if (typeof window === 'undefined') {
+    return randomSessionId()
+  }
+  const existing = window.localStorage.getItem(CHAT_SESSION_STORAGE_KEY)
+  if (existing) {
+    return existing
+  }
+  const nextSessionId = randomSessionId()
+  window.localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId)
+  return nextSessionId
+}
+
+function loadStoredMessages() {
+  if (typeof window === 'undefined') {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY) || '[]')
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+    return parsed.filter((item) => (
+      (item?.role === 'user' || item?.role === 'assistant') &&
+      typeof item?.content === 'string'
+    ))
+  } catch {
+    return []
+  }
+}
+
+function saveStoredMessages() {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.localStorage.setItem(
+    CHAT_MESSAGES_STORAGE_KEY,
+    JSON.stringify(messages.value.slice(-40)),
+  )
+}
+
 const input = ref('')
 const messages = ref([])
 const loading = ref(false)
 const msgBox = ref(null)
-const sessionId = ref(Math.random().toString(36).slice(2, 10))
+const sessionId = ref(getStoredSessionId())
 const stats = ref({
   totalPackets: 0,
   alertCount: 0,
@@ -139,6 +187,7 @@ async function sendMessage() {
   if (!text || loading.value) return
 
   messages.value.push({ role: 'user', content: text })
+  saveStoredMessages()
   input.value = ''
   loading.value = true
   await scrollBottom()
@@ -149,11 +198,13 @@ async function sendMessage() {
       role: 'assistant',
       content: res.data.response,
     })
+    saveStoredMessages()
   } catch {
     messages.value.push({
       role: 'assistant',
       content: 'LLM 调用失败，请检查后端配置。',
     })
+    saveStoredMessages()
   } finally {
     loading.value = false
     await scrollBottom()
@@ -168,6 +219,8 @@ async function scrollBottom() {
 }
 
 onMounted(async () => {
+  messages.value = loadStoredMessages()
+  await scrollBottom()
   updateClock()
   if (isImmersive.value) {
     await refreshOverview()

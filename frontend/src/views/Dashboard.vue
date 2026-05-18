@@ -241,10 +241,25 @@
               最近 50 条记录中有 {{ visibleAttackCount }} 条为模拟攻击流量。
             </div>
           </div>
+          <el-button
+            plain
+            class="traffic-export-btn"
+            :icon="Download"
+            :disabled="!packets.length"
+            @click="exportRecentTraffic"
+          >
+            导出 Excel
+          </el-button>
         </div>
 
         <el-card class="panel-card table-card">
-          <el-table :data="packets" stripe style="width: 100%" max-height="520">
+          <el-table
+            :data="packets"
+            stripe
+            row-class-name="traffic-table-row"
+            style="width: 100%"
+            max-height="520"
+          >
             <el-table-column prop="protocol" label="协议" width="90" />
             <el-table-column label="类型" width="120">
               <template #default="{ row }">
@@ -331,7 +346,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { trafficApi, anomalyApi, systemApi } from '../api/index.js'
 import { createRealtimeWs } from '../api/ws.js'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
+import { downloadTrafficExcel, trafficAttackLabel } from '../utils/trafficExport.js'
 
 const stats = ref({ total_packets: 0, can_count: 0, eth_count: 0, v2x_count: 0 })
 const packets = ref([])
@@ -383,10 +400,16 @@ function severityColor(s) {
 }
 
 function attackLabel(row) {
-  if (!row?.is_attack) {
-    return '正常'
+  return trafficAttackLabel(row)
+}
+
+function exportRecentTraffic() {
+  if (!packets.value.length) {
+    ElMessage.warning('当前没有可导出的流量记录')
+    return
   }
-  return row.attack_type ? `恶意 / ${row.attack_type}` : '恶意'
+  downloadTrafficExcel(packets.value)
+  ElMessage.success(`已导出 ${packets.value.length} 条最近流量记录`)
 }
 
 async function loadData() {

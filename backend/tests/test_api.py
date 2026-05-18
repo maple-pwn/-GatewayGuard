@@ -174,6 +174,78 @@ class TestAnomalyAPI:
         assert "events" in data
 
     @pytest.mark.asyncio
+    async def test_events_list_omits_heavy_evidence_by_default(self, client):
+        async with async_session() as session:
+            event = AnomalyEventORM(
+                timestamp=time.time(),
+                anomaly_type="heavy_event",
+                severity="high",
+                confidence=0.9,
+                protocol="CAN",
+                source_node="SRC",
+                target_node="DST",
+                description="list payload should stay compact",
+                detection_method="unit_test",
+                status="open",
+                evidence='[{"payload":"large evidence only needed in details"}]',
+            )
+            session.add(event)
+            await session.commit()
+
+        resp = await client.get("/api/anomaly/events?limit=1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["events"]
+        assert "evidence" not in data["events"][0]
+
+    @pytest.mark.asyncio
+    async def test_summary_returns_lightweight_chart_data(self, client):
+        now = time.time()
+        async with async_session() as session:
+            session.add_all(
+                [
+                    AnomalyEventORM(
+                        timestamp=now - 30,
+                        anomaly_type="replay",
+                        severity="high",
+                        confidence=0.9,
+                        protocol="CAN",
+                        source_node="SRC",
+                        target_node="DST",
+                        description="summary event",
+                        detection_method="unit_test",
+                        status="open",
+                        evidence='[{"payload":"not needed by summary"}]',
+                    ),
+                    AnomalyEventORM(
+                        timestamp=now - 90,
+                        anomaly_type="spoofing",
+                        severity="low",
+                        confidence=0.4,
+                        protocol="ETH",
+                        source_node="SRC",
+                        target_node="DST",
+                        description="summary event",
+                        detection_method="unit_test",
+                        status="resolved",
+                        evidence='[{"payload":"not needed by summary"}]',
+                    ),
+                ]
+            )
+            await session.commit()
+
+        resp = await client.get("/api/anomaly/summary?window_minutes=60")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] >= 2
+        assert data["high_risk_count"] >= 1
+        assert data["open_count"] >= 1
+        assert any(item["name"] == "CAN" and item["value"] >= 1 for item in data["protocol"])
+        assert any(item["name"] == "high" and item["value"] >= 1 for item in data["severity"])
+        assert len(data["trend"]) == 61
+        assert "evidence" not in str(data)
+
+    @pytest.mark.asyncio
     async def test_get_event_not_found_returns_404(self, client):
         resp = await client.get("/api/anomaly/events/99999999")
         assert resp.status_code == 404
