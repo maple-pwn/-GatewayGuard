@@ -275,67 +275,86 @@
       <pre v-else-if="analysisResult" class="raw-block">{{ formatRaw(analysisResult) }}</pre>
     </el-dialog>
 
-    <el-dialog v-model="showReport" title="AI 预警报告" width="800px" top="5vh">
+    <el-dialog
+      v-model="showReport"
+      class="ai-report-dialog"
+      title="AI 预警报告"
+      width="860px"
+      top="5vh"
+    >
       <div v-if="reportLoading" class="dialog-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>正在生成预警报告，请稍候...</p>
       </div>
-      <div v-else-if="reportResult && !reportResult.report_raw">
-        <div class="report-head">
-          <h3>{{ reportResult.title || '预警报告' }}</h3>
-          <el-tag v-if="reportResult.risk_level" :type="riskTagType(reportResult.risk_level)" size="large" effect="dark">
-            {{ riskLabel(reportResult.risk_level) }}
-          </el-tag>
-        </div>
-
-        <el-alert
-          v-if="reportResult.summary"
-          :title="reportResult.summary"
-          type="info"
-          show-icon
-          :closable="false"
-          style="margin-bottom: 16px"
-        />
-
-        <div v-if="reportResult.attack_chain" style="margin-bottom: 16px">
-          <div class="section-title">攻击链分析</div>
-          <div class="report-text-block">{{ reportResult.attack_chain }}</div>
-        </div>
-
-        <div v-if="reportResult.timeline?.length" style="margin-bottom: 16px">
-          <div class="section-title">关键事件时间线</div>
-          <el-timeline>
-            <el-timeline-item
-              v-for="(t, i) in reportResult.timeline"
-              :key="i"
-              :timestamp="'#' + (i + 1)"
-              placement="top"
-            >
-              {{ t }}
-            </el-timeline-item>
-          </el-timeline>
-        </div>
-
-        <div v-if="reportResult.impact_assessment" style="margin-bottom: 16px">
-          <div class="section-title">影响评估</div>
-          <div class="report-text-block">{{ reportResult.impact_assessment }}</div>
-        </div>
-
-        <div v-if="reportResult.recommendations?.length" style="margin-bottom: 16px">
-          <div class="section-title">处置建议</div>
-          <div v-for="(r, i) in reportResult.recommendations" :key="i" class="rec-item">
-            <el-icon><SuccessFilled /></el-icon>
-            <span>{{ r }}</span>
+      <div v-else-if="reportResult && !reportResult.report_raw" class="ai-report">
+        <div class="report-hero">
+          <div class="report-hero__content">
+            <div class="report-hero__eyebrow">
+              <el-icon><DataAnalysis /></el-icon>
+              AI ALERT INTELLIGENCE
+            </div>
+            <h3>{{ reportResult.title || '预警报告' }}</h3>
+            <p v-if="reportResult.summary">{{ reportResult.summary }}</p>
+          </div>
+          <div class="report-risk-badge" :class="`report-risk-badge--${reportResult.risk_level || 'unknown'}`">
+            <span>Risk Level</span>
+            <strong>{{ riskLabel(reportResult.risk_level) || '未知' }}</strong>
           </div>
         </div>
 
-        <el-alert
-          v-if="reportResult.conclusion"
-          :title="reportResult.conclusion"
-          :type="riskAlertType(reportResult.risk_level)"
-          show-icon
-          :closable="false"
-        />
+        <div class="report-signal-grid">
+          <div v-if="reportResult.attack_chain" class="report-panel report-panel--span">
+            <div class="report-panel__title">
+              <el-icon><Connection /></el-icon>
+              攻击链分析
+            </div>
+            <div class="report-text-block">{{ reportResult.attack_chain }}</div>
+          </div>
+
+          <div v-if="reportResult.impact_assessment" class="report-panel">
+            <div class="report-panel__title">
+              <el-icon><WarningFilled /></el-icon>
+              影响评估
+            </div>
+            <div class="report-text-block">{{ reportResult.impact_assessment }}</div>
+          </div>
+
+          <div v-if="reportResult.recommendations?.length" class="report-panel">
+            <div class="report-panel__title">
+              <el-icon><Operation /></el-icon>
+              处置建议
+            </div>
+            <div class="report-recommendations">
+              <div v-for="(r, i) in reportResult.recommendations" :key="i" class="report-rec-item">
+                <span class="report-rec-item__index">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span>{{ r }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="reportResult.timeline?.length" class="report-panel report-timeline-panel">
+          <div class="report-panel__title">
+            <el-icon><TrendCharts /></el-icon>
+            关键事件时间线
+          </div>
+          <div class="report-timeline">
+            <div v-for="(t, i) in reportResult.timeline" :key="i" class="report-timeline__item">
+              <span class="report-timeline__index">#{{ i + 1 }}</span>
+              <span>{{ t }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="reportResult.conclusion" class="report-conclusion">
+          <div class="report-conclusion__icon">
+            <el-icon><Memo /></el-icon>
+          </div>
+          <div>
+            <span>研判结论</span>
+            <strong>{{ reportResult.conclusion }}</strong>
+          </div>
+        </div>
       </div>
       <pre v-else-if="reportResult" class="raw-block">{{ formatRaw(reportResult) }}</pre>
     </el-dialog>
@@ -350,7 +369,16 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, GaugeChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { Loading, SuccessFilled } from '@element-plus/icons-vue'
+import {
+  Connection,
+  DataAnalysis,
+  Loading,
+  Memo,
+  Operation,
+  SuccessFilled,
+  TrendCharts,
+  WarningFilled,
+} from '@element-plus/icons-vue'
 import { anomalyApi, llmApi } from '../api/index.js'
 import { ElMessage } from 'element-plus'
 import { buildEventChartData } from '../utils/eventCharts.js'
@@ -960,12 +988,325 @@ onMounted(loadPageData)
   white-space: pre-wrap;
 }
 
+:global(.ai-report-dialog) {
+  --report-panel-bg: rgba(245, 249, 255, 0.86);
+  --report-panel-line: rgba(84, 123, 184, 0.16);
+  --report-cyan: #0ea5b7;
+  --report-blue: #2f68ff;
+  --report-amber: #d28a18;
+  --report-red: #d94b65;
+}
+
+:global(.ai-report-dialog .el-dialog__body) {
+  padding-top: 8px;
+}
+
+.ai-report {
+  display: grid;
+  gap: 16px;
+}
+
+.report-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.28fr);
+  gap: 18px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid rgba(47, 104, 255, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(47, 104, 255, 0.12), rgba(14, 165, 183, 0.08) 45%, rgba(255, 255, 255, 0.84)),
+    repeating-linear-gradient(90deg, rgba(47, 104, 255, 0.06) 0, rgba(47, 104, 255, 0.06) 1px, transparent 1px, transparent 26px);
+}
+
+.report-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(14, 165, 183, 0.18), transparent 42%, rgba(217, 75, 101, 0.08));
+  opacity: 0.78;
+}
+
+.report-hero__content,
+.report-risk-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.report-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--report-cyan);
+  font-family: var(--gg-font-ui);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.report-hero h3 {
+  margin: 10px 0 8px;
+  color: var(--gg-text-strong);
+  font-family: var(--gg-font-display);
+  font-size: 22px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.report-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--gg-text);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.report-risk-badge {
+  align-self: stretch;
+  display: grid;
+  place-content: center;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid rgba(47, 104, 255, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  box-shadow: inset 0 0 24px rgba(47, 104, 255, 0.08);
+}
+
+.report-risk-badge span {
+  color: var(--gg-text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.report-risk-badge strong {
+  margin-top: 8px;
+  color: var(--report-blue);
+  font-family: var(--gg-font-metric);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.report-risk-badge--critical strong,
+.report-risk-badge--high strong {
+  color: var(--report-red);
+}
+
+.report-risk-badge--medium strong {
+  color: var(--report-amber);
+}
+
+.report-risk-badge--low strong {
+  color: #0d9b78;
+}
+
+.report-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.report-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid var(--report-panel-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, var(--report-panel-bg), rgba(255, 255, 255, 0.72)),
+    linear-gradient(90deg, rgba(14, 165, 183, 0.08), transparent);
+}
+
+.report-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--report-cyan), rgba(47, 104, 255, 0.12));
+}
+
+.report-panel--span,
+.report-timeline-panel {
+  grid-column: 1 / -1;
+}
+
+.report-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--gg-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.report-panel__title .el-icon {
+  color: var(--report-cyan);
+  font-size: 17px;
+}
+
+.report-panel .report-text-block {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.report-recommendations {
+  display: grid;
+  gap: 10px;
+}
+
+.report-rec-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: var(--gg-text);
+  line-height: 1.7;
+}
+
+.report-rec-item__index {
+  display: grid;
+  place-items: center;
+  height: 28px;
+  border-radius: 9px;
+  color: #0a6f8a;
+  font-family: var(--gg-font-metric);
+  font-size: 13px;
+  font-weight: 800;
+  background: rgba(14, 165, 183, 0.12);
+  border: 1px solid rgba(14, 165, 183, 0.2);
+}
+
+.report-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.report-timeline__item {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 11px 12px;
+  border: 1px solid rgba(84, 123, 184, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--gg-text);
+  line-height: 1.65;
+}
+
+.report-timeline__index {
+  color: var(--report-blue);
+  font-family: var(--gg-font-metric);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.report-conclusion {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 15px 16px;
+  border: 1px solid rgba(217, 75, 101, 0.2);
+  border-radius: 16px;
+  background:
+    linear-gradient(90deg, rgba(217, 75, 101, 0.1), rgba(255, 198, 92, 0.08)),
+    rgba(255, 255, 255, 0.78);
+}
+
+.report-conclusion__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: var(--report-red);
+  background: rgba(217, 75, 101, 0.12);
+}
+
+.report-conclusion span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--gg-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-conclusion strong {
+  display: block;
+  color: var(--gg-text-strong);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+:global(.shell--immersive) .report-hero {
+  border-color: rgba(93, 215, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(72, 123, 255, 0.18), rgba(19, 211, 188, 0.08) 48%, rgba(7, 13, 23, 0.72)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.08) 0, rgba(93, 215, 255, 0.08) 1px, transparent 1px, transparent 26px);
+}
+
+:global(.shell--immersive) .report-hero h3,
+:global(.shell--immersive) .report-panel__title,
+:global(.shell--immersive) .report-conclusion strong {
+  color: #edf4ff;
+}
+
+:global(.shell--immersive) .report-hero p,
+:global(.shell--immersive) .report-rec-item,
+:global(.shell--immersive) .report-timeline__item,
+:global(.shell--immersive) .report-panel .report-text-block {
+  color: #dce8fb;
+}
+
+:global(.shell--immersive) .report-risk-badge,
+:global(.shell--immersive) .report-panel,
+:global(.shell--immersive) .report-timeline__item,
+:global(.shell--immersive) .report-conclusion {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(.shell--immersive) .report-risk-badge strong {
+  text-shadow: 0 0 18px rgba(93, 215, 255, 0.3);
+}
+
+:global(.shell--immersive) .report-rec-item__index {
+  color: #55f1df;
+  background: rgba(85, 241, 223, 0.1);
+  border-color: rgba(85, 241, 223, 0.18);
+}
+
+:global(.shell--immersive) .report-conclusion span,
+:global(.shell--immersive) .report-risk-badge span {
+  color: rgba(204, 224, 252, 0.72);
+}
+
 @media (max-width: 1080px) {
   .situation-grid,
   .chart-grid,
   .events-grid,
   .filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .report-hero,
+  .report-signal-grid,
+  .report-conclusion {
+    grid-template-columns: 1fr;
+  }
+
+  .report-risk-badge {
+    min-height: 92px;
   }
 }
 </style>
