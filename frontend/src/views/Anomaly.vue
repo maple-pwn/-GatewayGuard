@@ -54,7 +54,7 @@
             <div class="situation-card__eyebrow">Event Trend</div>
             <div class="situation-card__title">事件趋势</div>
           </div>
-          <span class="situation-card__meta">最近一小时 / 按分钟聚合</span>
+          <span class="situation-card__meta">{{ trendWindowLabel }} / 按分钟聚合</span>
         </div>
         <VChart class="situation-chart situation-chart--large" :option="trendOption" autoresize />
       </el-card>
@@ -114,6 +114,7 @@
 
     <section class="section-block events-grid">
       <el-card class="panel-card">
+        <div class="events-filter__eyebrow">Event Intelligence</div>
         <div class="filter-grid">
           <div class="filter-field">
             <label>严重程度</label>
@@ -133,6 +134,26 @@
               <el-option label="已解决" value="resolved" />
             </el-select>
           </div>
+          <div class="filter-field">
+            <label>协议类型</label>
+            <el-select v-model="filter.protocol" placeholder="全部协议" clearable>
+              <el-option label="CAN" value="CAN" />
+              <el-option label="ETH" value="ETH" />
+              <el-option label="V2X" value="V2X" />
+            </el-select>
+          </div>
+          <div class="filter-field filter-field--wide">
+            <label>时间段</label>
+            <el-date-picker
+              v-model="filter.timeRange"
+              type="datetimerange"
+              value-format="x"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
+              range-separator="至"
+              clearable
+            />
+          </div>
           <div class="filter-action">
             <el-button
               type="primary"
@@ -141,6 +162,13 @@
               @click="loadPageData"
             >
               查询事件
+            </el-button>
+            <el-button
+              class="ai-action-btn ai-action-btn--clear"
+              :loading="clearLoading"
+              @click="clearFilteredEvents"
+            >
+              清空记录
             </el-button>
           </div>
         </div>
@@ -179,6 +207,15 @@
           <div class="section-head__title">异常事件列表</div>
           <div class="section-head__desc">保留原始数据字段与逐条 AI 分析能力。</div>
         </div>
+        <el-button
+          plain
+          class="traffic-export-btn"
+          :icon="Download"
+          :disabled="!events.length"
+          @click="exportEventsExcel"
+        >
+          导出 Excel
+        </el-button>
       </div>
 
       <el-card class="panel-card table-card" v-loading="eventsLoading">
@@ -187,7 +224,9 @@
           <el-table-column prop="anomaly_type" label="类型" width="180" />
           <el-table-column label="严重程度" width="110">
             <template #default="{ row }">
-              <el-tag :type="severityColor(row.severity)" size="small">{{ row.severity }}</el-tag>
+              <el-tag class="severity-chip" :class="`severity-chip--${row.severity || 'unknown'}`" size="small">
+                {{ row.severity }}
+              </el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="confidence" label="置信度" width="100">
@@ -200,7 +239,7 @@
           <el-table-column prop="description" label="描述" min-width="240" show-overflow-tooltip />
           <el-table-column label="操作" width="150" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" type="warning" @click="analyzeEvent(row)">
+              <el-button size="small" class="table-ai-btn" @click="analyzeEvent(row)">
                 AI 分析
               </el-button>
             </template>
@@ -209,66 +248,85 @@
       </el-card>
     </section>
 
-    <el-dialog v-model="showAnalysis" title="AI 语义分析" width="720px">
+    <el-dialog
+      v-model="showAnalysis"
+      class="ai-report-dialog ai-analysis-dialog"
+      title="AI 语义分析"
+      width="860px"
+      top="5vh"
+    >
       <div v-if="analysisLoading" class="dialog-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>正在调用 LLM 分析...</p>
       </div>
-      <div v-else-if="analysisResult && !analysisResult.analyze_raw">
-        <el-alert
-          v-if="analysisResult.summary"
-          :title="analysisResult.summary"
-          :type="riskAlertType(analysisResult.risk_level)"
-          show-icon
-          :closable="false"
-          style="margin-bottom: 16px"
-        />
-
-        <el-row :gutter="12" style="margin-bottom: 16px">
-          <el-col :span="8">
-            <div class="info-card">
-              <div class="info-label">攻击类型</div>
-              <div class="info-value">{{ analysisResult.attack_type || '-' }}</div>
+      <div v-else-if="analysisResult && !analysisResult.analyze_raw" class="ai-report ai-analysis">
+        <div class="report-hero">
+          <div class="report-hero__content">
+            <div class="report-hero__eyebrow">
+              <el-icon><DataAnalysis /></el-icon>
+              AI SEMANTIC TRIAGE
             </div>
-          </el-col>
-          <el-col :span="8">
-            <div class="info-card">
-              <div class="info-label">风险等级</div>
-              <el-tag :type="riskTagType(analysisResult.risk_level)" size="large" effect="dark">
-                {{ riskLabel(analysisResult.risk_level) }}
-              </el-tag>
-            </div>
-          </el-col>
-          <el-col :span="8">
-            <div class="info-card">
-              <div class="info-label">攻击意图</div>
-              <div class="info-value">{{ analysisResult.attack_intent || '-' }}</div>
-            </div>
-          </el-col>
-        </el-row>
-
-        <el-descriptions :column="1" border style="margin-bottom: 16px">
-          <el-descriptions-item label="攻击手法">{{ analysisResult.attack_method || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="根因分析">{{ analysisResult.root_cause || '-' }}</el-descriptions-item>
-        </el-descriptions>
-
-        <div v-if="analysisResult.affected_scope?.length" style="margin-bottom: 16px">
-          <div class="section-title">影响范围</div>
-          <el-tag
-            v-for="(s, i) in analysisResult.affected_scope"
-            :key="i"
-            type="warning"
-            class="scope-tag"
-          >
-            {{ s }}
-          </el-tag>
+            <h3>{{ analysisResult.attack_type || '异常事件研判' }}</h3>
+            <p>{{ analysisResult.summary || '已完成异常事件语义分析。' }}</p>
+          </div>
+          <div class="report-risk-badge" :class="`report-risk-badge--${analysisResult.risk_level || 'unknown'}`">
+            <span>Risk Level</span>
+            <strong>{{ riskLabel(analysisResult.risk_level) || '未知' }}</strong>
+          </div>
         </div>
 
-        <div v-if="analysisResult.recommendations?.length">
-          <div class="section-title">处置建议</div>
-          <div v-for="(r, i) in analysisResult.recommendations" :key="i" class="rec-item">
-            <el-icon><SuccessFilled /></el-icon>
-            <span>{{ r }}</span>
+        <div class="analysis-signal-grid">
+          <div class="report-panel">
+            <div class="report-panel__title">
+              <el-icon><WarningFilled /></el-icon>
+              攻击意图
+            </div>
+            <div class="report-text-block">{{ analysisResult.attack_intent || '-' }}</div>
+          </div>
+
+          <div class="report-panel">
+            <div class="report-panel__title">
+              <el-icon><Operation /></el-icon>
+              攻击手法
+            </div>
+            <div class="report-text-block">{{ analysisResult.attack_method || '-' }}</div>
+          </div>
+
+          <div class="report-panel report-panel--span">
+            <div class="report-panel__title">
+              <el-icon><Connection /></el-icon>
+              根因分析
+            </div>
+            <div class="report-text-block">{{ analysisResult.root_cause || '-' }}</div>
+          </div>
+
+          <div v-if="analysisResult.affected_scope?.length" class="report-panel report-panel--span">
+            <div class="report-panel__title">
+              <el-icon><TrendCharts /></el-icon>
+              影响范围
+            </div>
+            <div class="analysis-scope-list">
+              <span
+                v-for="(s, i) in analysisResult.affected_scope"
+                :key="i"
+                class="analysis-scope-chip"
+              >
+                {{ s }}
+              </span>
+            </div>
+          </div>
+
+          <div v-if="analysisResult.recommendations?.length" class="report-panel report-panel--span">
+            <div class="report-panel__title">
+              <el-icon><SuccessFilled /></el-icon>
+              处置建议
+            </div>
+            <div class="report-recommendations">
+              <div v-for="(r, i) in analysisResult.recommendations" :key="i" class="report-rec-item">
+                <span class="report-rec-item__index">{{ String(i + 1).padStart(2, '0') }}</span>
+                <span>{{ r }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -378,9 +436,10 @@ import {
   SuccessFilled,
   TrendCharts,
   WarningFilled,
+  Download,
 } from '@element-plus/icons-vue'
-import { anomalyApi, llmApi } from '../api/index.js'
-import { ElMessage } from 'element-plus'
+import { anomalyApi, llmApi, systemApi } from '../api/index.js'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { buildEventChartData } from '../utils/eventCharts.js'
 
 use([
@@ -397,7 +456,7 @@ use([
 const route = useRoute()
 const events = ref([])
 const total = ref(0)
-const filter = ref({ severity: 'all', status: '' })
+const filter = ref({ severity: 'all', status: '', protocol: '', timeRange: [] })
 const reportLoading = ref(false)
 const showAnalysis = ref(false)
 const analysisLoading = ref(false)
@@ -412,6 +471,7 @@ const highRiskCount = ref(0)
 const openCount = ref(0)
 const eventsLoading = ref(false)
 const summaryLoading = ref(false)
+const clearLoading = ref(false)
 
 function severityColor(s) {
   return { critical: 'danger', high: 'danger', medium: 'warning', low: 'info' }[s] || 'info'
@@ -440,6 +500,15 @@ function riskLabel(level) {
 
 const chartTextColor = computed(() => (isImmersive.value ? '#dce8fb' : '#51647f'))
 const chartSplitColor = computed(() => (isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7'))
+const chartTooltipStyle = computed(() => ({
+  backgroundColor: isImmersive.value ? 'rgba(7, 15, 27, 0.94)' : 'rgba(255, 255, 255, 0.96)',
+  borderColor: isImmersive.value ? 'rgba(93, 215, 255, 0.24)' : 'rgba(62, 103, 255, 0.18)',
+  textStyle: { color: isImmersive.value ? '#edf6ff' : '#162130' },
+  extraCssText: 'border-radius: 12px; box-shadow: 0 18px 38px rgba(0,0,0,0.22); backdrop-filter: blur(12px);',
+}))
+const trendWindowLabel = computed(() => (
+  filter.value.timeRange?.length === 2 ? '所选时间段' : '最近一小时'
+))
 
 const riskGaugeOption = computed(() => ({
   backgroundColor: 'transparent',
@@ -488,7 +557,7 @@ const riskGaugeOption = computed(() => ({
 
 const trendOption = computed(() => ({
   backgroundColor: 'transparent',
-  tooltip: { trigger: 'axis' },
+  tooltip: { trigger: 'axis', ...chartTooltipStyle.value },
   legend: {
     top: 0,
     right: 0,
@@ -513,7 +582,7 @@ const trendOption = computed(() => ({
       type: 'line',
       smooth: true,
       symbolSize: 7,
-      areaStyle: { color: 'rgba(86, 184, 255, 0.16)' },
+      areaStyle: { color: isImmersive.value ? 'rgba(86, 184, 255, 0.2)' : 'rgba(61, 103, 255, 0.12)' },
       lineStyle: { width: 3, color: '#5dd7ff' },
       itemStyle: { color: '#5dd7ff' },
       data: chartData.value.trend.map((item) => item.total),
@@ -523,8 +592,9 @@ const trendOption = computed(() => ({
       type: 'line',
       smooth: true,
       symbolSize: 7,
-      lineStyle: { width: 3, color: '#ff6678' },
-      itemStyle: { color: '#ff6678' },
+      areaStyle: { color: 'rgba(193, 69, 95, 0.08)' },
+      lineStyle: { width: 3, color: '#c1455f' },
+      itemStyle: { color: '#c1455f' },
       data: chartData.value.trend.map((item) => item.highRisk),
     },
   ],
@@ -532,12 +602,12 @@ const trendOption = computed(() => ({
 
 const severityPieOption = computed(() => ({
   backgroundColor: 'transparent',
-  tooltip: { trigger: 'item' },
+  tooltip: { trigger: 'item', ...chartTooltipStyle.value },
   legend: {
     bottom: 0,
     textStyle: { color: chartTextColor.value },
   },
-  color: ['#ff6678', '#ff9f5f', '#ffc65c', '#58d8c4'],
+  color: ['#9d3048', '#a24f2d', '#9d7320', '#247d70'],
   series: [
     {
       type: 'pie',
@@ -545,6 +615,10 @@ const severityPieOption = computed(() => ({
       center: ['50%', '44%'],
       avoidLabelOverlap: true,
       label: { color: chartTextColor.value, formatter: '{b}: {c}' },
+      itemStyle: {
+        borderColor: isImmersive.value ? 'rgba(5, 12, 22, 0.85)' : '#ffffff',
+        borderWidth: 2,
+      },
       data: chartData.value.severity,
     },
   ],
@@ -552,7 +626,7 @@ const severityPieOption = computed(() => ({
 
 const protocolBarOption = computed(() => ({
   backgroundColor: 'transparent',
-  tooltip: { trigger: 'axis' },
+  tooltip: { trigger: 'axis', ...chartTooltipStyle.value },
   grid: { left: 34, right: 16, top: 24, bottom: 30 },
   xAxis: {
     type: 'category',
@@ -573,7 +647,17 @@ const protocolBarOption = computed(() => ({
       data: chartData.value.protocol.map((item) => item.value),
       itemStyle: {
         borderRadius: [8, 8, 0, 0],
-        color: '#5dd7ff',
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: '#5dd7ff' },
+            { offset: 1, color: '#3159b8' },
+          ],
+        },
       },
     },
   ],
@@ -581,7 +665,7 @@ const protocolBarOption = computed(() => ({
 
 const typeBarOption = computed(() => ({
   backgroundColor: 'transparent',
-  tooltip: { trigger: 'axis' },
+  tooltip: { trigger: 'axis', ...chartTooltipStyle.value },
   grid: { left: 86, right: 16, top: 24, bottom: 24 },
   xAxis: {
     type: 'value',
@@ -602,7 +686,17 @@ const typeBarOption = computed(() => ({
       data: chartData.value.typeTop.map((item) => item.value).reverse(),
       itemStyle: {
         borderRadius: [0, 8, 8, 0],
-        color: '#58d8c4',
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 1,
+          y2: 0,
+          colorStops: [
+            { offset: 0, color: '#247d70' },
+            { offset: 1, color: '#5dd7ff' },
+          ],
+        },
       },
     },
   ],
@@ -614,7 +708,26 @@ function buildQueryParams() {
     params.severity = filter.value.severity
   }
   if (filter.value.status) params.status = filter.value.status
+  if (filter.value.protocol) params.protocol = filter.value.protocol
+  const [start, end] = filter.value.timeRange || []
+  if (start) params.start_time = Number(start) / 1000
+  if (end) params.end_time = Number(end) / 1000
   return params
+}
+
+function hasActiveFilter() {
+  return Boolean(
+    (filter.value.severity && filter.value.severity !== 'all')
+      || filter.value.status
+      || filter.value.protocol
+      || (filter.value.timeRange && filter.value.timeRange.length === 2),
+  )
+}
+
+function summaryWindowMinutes() {
+  const [start, end] = filter.value.timeRange || []
+  if (!start || !end) return 60
+  return Math.min(1440, Math.max(1, Math.ceil((Number(end) - Number(start)) / 60000)))
 }
 
 async function loadEvents() {
@@ -634,7 +747,10 @@ async function loadEvents() {
 async function loadSummary() {
   summaryLoading.value = true
   try {
-    const res = await anomalyApi.getSummary({ ...buildQueryParams(), window_minutes: 60 })
+    const res = await anomalyApi.getSummary({
+      ...buildQueryParams(),
+      window_minutes: summaryWindowMinutes(),
+    })
     chartData.value = res.data
     total.value = res.data.total
     highRiskCount.value = res.data.high_risk_count || 0
@@ -648,6 +764,95 @@ async function loadSummary() {
 
 async function loadPageData() {
   await Promise.all([loadEvents(), loadSummary()])
+}
+
+async function clearFilteredEvents() {
+  const params = buildQueryParams()
+  if (!hasActiveFilter()) {
+    params.all_records = true
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      hasActiveFilter()
+        ? '确定清空当前筛选条件匹配的异常事件记录吗？此操作不可恢复。'
+        : '当前没有筛选条件，将清空全部异常事件记录。此操作不可恢复，确定继续吗？',
+      '清空异常记录',
+      {
+        confirmButtonText: '确定清空',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  clearLoading.value = true
+  try {
+    const res = await systemApi.clearAnomalies(params)
+    ElMessage.success(res.data.message || '异常记录已清空')
+    await loadPageData()
+  } catch {
+    ElMessage.error('清空异常记录失败')
+  } finally {
+    clearLoading.value = false
+  }
+}
+
+function formatEventTimestamp(timestamp) {
+  const numericTimestamp = Number(timestamp)
+  if (!Number.isFinite(numericTimestamp)) return ''
+  return new Date(numericTimestamp * 1000).toLocaleString()
+}
+
+function escapeExcelCell(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function exportEventsExcel() {
+  if (!events.value.length) {
+    ElMessage.warning('当前没有可导出的异常事件')
+    return
+  }
+
+  const columns = [
+    ['id', 'ID'],
+    ['anomaly_type', '类型'],
+    ['severity', '严重程度'],
+    ['confidence', '置信度'],
+    ['protocol', '协议'],
+    ['source_node', '源节点'],
+    ['target_node', '目标节点'],
+    ['description', '描述'],
+    ['timestamp', '时间'],
+  ]
+  const headerCells = columns.map(([, label]) => `<th>${escapeExcelCell(label)}</th>`).join('')
+  const bodyRows = events.value.map((row) => {
+    const values = {
+      ...row,
+      confidence: `${((row.confidence || 0) * 100).toFixed(0)}%`,
+      timestamp: formatEventTimestamp(row.timestamp),
+    }
+    const cells = columns.map(([key]) => `<td>${escapeExcelCell(values[key])}</td>`).join('')
+    return `<tr>${cells}</tr>`
+  }).join('')
+  const content = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>table{border-collapse:collapse;}th,td{border:1px solid #7f8da3;padding:6px 10px;mso-number-format:"\\@";}th{background:#dfe8f5;font-weight:700;}</style></head><body><table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></body></html>`
+  const dateStamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
+  const blob = new Blob([`\ufeff${content}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `gatewayguard-events-${dateStamp}.xls`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+  ElMessage.success(`已导出 ${events.value.length} 条异常事件`)
 }
 
 async function analyzeEvent(row) {
@@ -742,6 +947,20 @@ onMounted(loadPageData)
 .chart-card :deep(.el-card__body) {
   position: relative;
   z-index: 1;
+}
+
+.chart-card {
+  border-color: rgba(61, 103, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 255, 0.86)),
+    repeating-linear-gradient(90deg, rgba(61, 103, 255, 0.035) 0, rgba(61, 103, 255, 0.035) 1px, transparent 1px, transparent 28px);
+}
+
+:global(.shell--immersive) .chart-card {
+  border-color: rgba(93, 215, 255, 0.14) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.045) 0, rgba(93, 215, 255, 0.045) 1px, transparent 1px, transparent 28px) !important;
 }
 
 .situation-card__head {
@@ -879,7 +1098,7 @@ onMounted(loadPageData)
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(320px, 1.35fr);
   gap: 16px;
   align-items: end;
 }
@@ -895,7 +1114,151 @@ onMounted(loadPageData)
   font-size: 13px;
 }
 
+.filter-field :deep(.el-date-editor.el-input__wrapper) {
+  width: 100%;
+}
+
+.filter-action {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.filter-action :deep(.el-button) {
+  width: 100%;
+  min-height: 54px;
+  margin: 0;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.filter-action :deep(.ai-action-btn--clear) {
+  --el-button-bg-color: rgba(55, 12, 24, 0.92);
+  --el-button-border-color: rgba(134, 39, 58, 0.78);
+  --el-button-text-color: #f2b8c1;
+  --el-button-hover-bg-color: rgba(85, 18, 35, 0.96);
+  --el-button-hover-border-color: rgba(176, 55, 76, 0.9);
+  --el-button-hover-text-color: #ffe5ea;
+  --el-button-active-bg-color: rgba(44, 10, 19, 0.98);
+  --el-button-active-border-color: rgba(155, 45, 65, 0.9);
+  color: #f2b8c1 !important;
+  border-color: rgba(134, 39, 58, 0.78) !important;
+  background:
+    linear-gradient(180deg, rgba(94, 20, 35, 0.72), rgba(44, 11, 20, 0.78)),
+    rgba(20, 8, 14, 0.62) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 180, 193, 0.08),
+    0 12px 28px rgba(75, 13, 28, 0.2) !important;
+}
+
+.filter-action :deep(.ai-action-btn--clear:hover),
+.filter-action :deep(.ai-action-btn--clear:focus) {
+  color: #ffe5ea !important;
+  border-color: rgba(176, 55, 76, 0.9) !important;
+  background:
+    linear-gradient(180deg, rgba(122, 28, 48, 0.86), rgba(55, 12, 24, 0.88)),
+    rgba(31, 9, 17, 0.74) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 202, 0.1),
+    0 16px 34px rgba(92, 16, 34, 0.28) !important;
+}
+
+.severity-chip {
+  --el-tag-border-color: rgba(128, 150, 180, 0.28);
+  --el-tag-bg-color: rgba(128, 150, 180, 0.1);
+  --el-tag-text-color: #64748b;
+  min-width: 72px;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.severity-chip--critical {
+  --el-tag-border-color: rgba(147, 48, 66, 0.46);
+  --el-tag-bg-color: rgba(118, 28, 45, 0.14);
+  --el-tag-text-color: #9d3048;
+}
+
+.severity-chip--high {
+  --el-tag-border-color: rgba(173, 87, 48, 0.42);
+  --el-tag-bg-color: rgba(148, 70, 36, 0.12);
+  --el-tag-text-color: #a24f2d;
+}
+
+.severity-chip--medium {
+  --el-tag-border-color: rgba(176, 132, 45, 0.42);
+  --el-tag-bg-color: rgba(168, 124, 36, 0.12);
+  --el-tag-text-color: #9d7320;
+}
+
+.severity-chip--low {
+  --el-tag-border-color: rgba(53, 139, 122, 0.38);
+  --el-tag-bg-color: rgba(40, 139, 119, 0.11);
+  --el-tag-text-color: #247d70;
+}
+
+:global(.shell--immersive) .severity-chip--critical {
+  --el-tag-border-color: rgba(194, 69, 92, 0.48);
+  --el-tag-bg-color: rgba(94, 20, 35, 0.32);
+  --el-tag-text-color: #f0a7b4;
+}
+
+:global(.shell--immersive) .severity-chip--high {
+  --el-tag-border-color: rgba(203, 104, 58, 0.46);
+  --el-tag-bg-color: rgba(104, 45, 23, 0.28);
+  --el-tag-text-color: #f0ba91;
+}
+
+:global(.shell--immersive) .severity-chip--medium {
+  --el-tag-border-color: rgba(213, 164, 61, 0.42);
+  --el-tag-bg-color: rgba(105, 78, 22, 0.26);
+  --el-tag-text-color: #f1d28b;
+}
+
+:global(.shell--immersive) .severity-chip--low {
+  --el-tag-border-color: rgba(78, 185, 165, 0.38);
+  --el-tag-bg-color: rgba(32, 112, 98, 0.24);
+  --el-tag-text-color: #9ee5d7;
+}
+
+.table-ai-btn {
+  --el-button-bg-color: rgba(41, 71, 126, 0.1);
+  --el-button-border-color: rgba(61, 103, 255, 0.24);
+  --el-button-text-color: #3159b8;
+  --el-button-hover-bg-color: rgba(61, 103, 255, 0.14);
+  --el-button-hover-border-color: rgba(61, 103, 255, 0.38);
+  --el-button-hover-text-color: #244bb2;
+  --el-button-active-bg-color: rgba(61, 103, 255, 0.18);
+  border-radius: 999px;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+:global(.shell--immersive) .table-ai-btn {
+  --el-button-bg-color: rgba(75, 118, 255, 0.12);
+  --el-button-border-color: rgba(118, 166, 255, 0.28);
+  --el-button-text-color: #bcd3ff;
+  --el-button-hover-bg-color: rgba(75, 118, 255, 0.2);
+  --el-button-hover-border-color: rgba(132, 180, 255, 0.44);
+  --el-button-hover-text-color: #eef4ff;
+}
+
 .ai-box__eyebrow {
+  color: #9fb6dd;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.events-filter__eyebrow {
+  margin-bottom: 14px;
   color: #9fb6dd;
   font-size: 12px;
   letter-spacing: 0.14em;
@@ -1107,7 +1470,34 @@ onMounted(loadPageData)
   color: #0d9b78;
 }
 
+.analysis-scope-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.analysis-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(14, 165, 183, 0.22);
+  border-radius: 999px;
+  color: #0d7d8d;
+  background: rgba(14, 165, 183, 0.08);
+  font-family: var(--gg-font-ui);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
 .report-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.analysis-signal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
@@ -1291,6 +1681,12 @@ onMounted(loadPageData)
   color: rgba(204, 224, 252, 0.72);
 }
 
+:global(.shell--immersive) .analysis-scope-chip {
+  color: #9eeafa;
+  border-color: rgba(94, 215, 255, 0.26);
+  background: rgba(62, 178, 220, 0.12);
+}
+
 @media (max-width: 1080px) {
   .situation-grid,
   .chart-grid,
@@ -1301,6 +1697,7 @@ onMounted(loadPageData)
 
   .report-hero,
   .report-signal-grid,
+  .analysis-signal-grid,
   .report-conclusion {
     grid-template-columns: 1fr;
   }

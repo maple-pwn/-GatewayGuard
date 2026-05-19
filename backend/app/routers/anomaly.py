@@ -130,11 +130,25 @@ def _risk_summary(total: int, weighted_score: float, critical_count: int, high_c
     return {"riskLabel": "LOW", "riskScore": risk_score, "riskHint": "当前态势相对平稳"}
 
 
-def _apply_event_filters(stmt, severity: Optional[str], status: Optional[str], record_type):
+def _apply_event_filters(
+    stmt,
+    severity: Optional[str],
+    status: Optional[str],
+    record_type,
+    protocol: Optional[str] = None,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None,
+):
     if severity:
         stmt = stmt.where(AnomalyEventORM.severity == severity)
     if status:
         stmt = stmt.where(AnomalyEventORM.status == status)
+    if protocol:
+        stmt = stmt.where(AnomalyEventORM.protocol == protocol.upper())
+    if start_time is not None:
+        stmt = stmt.where(AnomalyEventORM.timestamp >= start_time)
+    if end_time is not None:
+        stmt = stmt.where(AnomalyEventORM.timestamp <= end_time)
     if record_type == "aggregated_event":
         stmt = stmt.where(AnomalyEventORM.detection_method == "event_aggregation")
     elif record_type == "packet_alert":
@@ -152,7 +166,10 @@ async def get_detector_status():
 async def get_anomaly_events(
     severity: str = Query(None),
     status: str = Query(None),
+    protocol: Optional[str] = Query(None, description="协议类型: CAN/ETH/V2X"),
     record_type: Optional[Literal["packet_alert", "aggregated_event"]] = Query(None),
+    start_time: Optional[float] = Query(None, description="起始时间戳，秒"),
+    end_time: Optional[float] = Query(None, description="结束时间戳，秒"),
     limit: int = Query(50, le=1000),
     offset: int = 0,
     include_evidence: bool = Query(False),
@@ -164,12 +181,18 @@ async def get_anomaly_events(
         severity,
         status,
         record_type,
+        protocol,
+        start_time,
+        end_time,
     )
     count_stmt = _apply_event_filters(
         select(func.count()).select_from(AnomalyEventORM),
         severity,
         status,
         record_type,
+        protocol,
+        start_time,
+        end_time,
     )
     total = await db.scalar(count_stmt)
 
@@ -211,7 +234,10 @@ async def get_anomaly_events(
 async def get_anomaly_summary(
     severity: str = Query(None),
     status: str = Query(None),
+    protocol: Optional[str] = Query(None, description="协议类型: CAN/ETH/V2X"),
     record_type: Optional[Literal["packet_alert", "aggregated_event"]] = Query(None),
+    start_time: Optional[float] = Query(None, description="起始时间戳，秒"),
+    end_time: Optional[float] = Query(None, description="结束时间戳，秒"),
     window_minutes: int = Query(60, ge=1, le=1440),
     db: AsyncSession = Depends(get_db),
 ):
@@ -221,6 +247,9 @@ async def get_anomaly_summary(
         severity,
         status,
         record_type,
+        protocol,
+        start_time,
+        end_time,
     )
     total = int(await db.scalar(total_stmt) or 0)
 
@@ -231,6 +260,9 @@ async def get_anomaly_summary(
                 severity,
                 status,
                 record_type,
+                protocol,
+                start_time,
+                end_time,
             )
         )
     ).all()
@@ -241,6 +273,9 @@ async def get_anomaly_summary(
                 severity,
                 status,
                 record_type,
+                protocol,
+                start_time,
+                end_time,
             )
         )
     ).all()
@@ -251,6 +286,9 @@ async def get_anomaly_summary(
                 severity,
                 status,
                 record_type,
+                protocol,
+                start_time,
+                end_time,
             )
         )
     ).all()
@@ -264,6 +302,9 @@ async def get_anomaly_summary(
                 severity,
                 status,
                 record_type,
+                protocol,
+                start_time,
+                end_time,
             )
         )
     ).all()
@@ -277,9 +318,15 @@ async def get_anomaly_summary(
         + severity_counts.get("low", 0)
     )
 
-    now = time.time()
-    end_minute = _minute_start(now)
-    start_minute = end_minute - window_minutes * 60
+    trend_end = end_time if end_time is not None else time.time()
+    end_minute = _minute_start(trend_end)
+    start_minute = (
+        _minute_start(start_time)
+        if start_time is not None
+        else end_minute - window_minutes * 60
+    )
+    if end_minute - start_minute > window_minutes * 60:
+        start_minute = end_minute - window_minutes * 60
     buckets = {
         minute: {
             "timestamp": minute,
@@ -296,6 +343,9 @@ async def get_anomaly_summary(
         severity,
         status,
         record_type,
+        protocol,
+        start_time,
+        end_time,
     )
     trend_rows = (await db.execute(trend_stmt)).all()
     for timestamp, row_severity in trend_rows:

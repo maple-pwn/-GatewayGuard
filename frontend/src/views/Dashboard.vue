@@ -34,10 +34,12 @@
     </section>
 
     <section class="section-block console-grid">
-      <el-card class="panel-card">
+      <el-card class="panel-card console-control-panel">
         <div class="console-head">
           <div class="panel-header__title">运行控制</div>
-          <el-tag :type="wsStateTag" effect="plain">{{ wsStateLabel }}</el-tag>
+          <el-tag class="ws-state-chip" :class="`ws-state-chip--${wsState}`" effect="plain">
+            {{ wsStateLabel }}
+          </el-tag>
         </div>
 
         <div class="console-cards">
@@ -63,7 +65,16 @@
           </div>
 
           <div class="console-card">
-            <div class="console-card__title">检测器</div>
+            <div class="console-card__head">
+              <div class="console-card__title">检测器</div>
+              <el-tag
+                class="ws-state-chip detector-state-chip"
+                :class="detectorStateClass"
+                effect="plain"
+              >
+                {{ detectorStateLabel }}
+              </el-tag>
+            </div>
             <div class="console-actions">
               <el-button
                 type="warning"
@@ -132,15 +143,6 @@
           </div>
         </div>
 
-        <div v-if="trainingResult" class="console-result">
-          <el-alert
-            :title="trainingResult.message"
-            :type="trainingResult.trained ? 'success' : 'warning'"
-            show-icon
-            :closable="false"
-          />
-        </div>
-
         <div v-if="detectResult" class="console-result">
           <el-alert
             :title="`检测完成，发现 ${detectResult.detected} 个异常`"
@@ -151,7 +153,7 @@
         </div>
       </el-card>
 
-      <el-card class="panel-card">
+      <el-card class="panel-card maintenance-panel">
         <template #header>
           <div class="panel-header">
             <div>
@@ -186,103 +188,48 @@
               按条件清理
             </el-button>
           </div>
-
-          <div class="maintenance-item">
-            <div class="maintenance-item__title">快速清理</div>
-            <div class="maintenance-actions">
-              <el-button @click="keepRecent(500)">保留最近 500 条</el-button>
-              <el-button @click="clearByProtocol('CAN')">删除 CAN</el-button>
-              <el-button
-                type="danger"
-                class="console-action-btn console-action-btn--clear-all"
-                @click="clearData"
-                :loading="clearLoading"
-              >
-                清空全部数据
-              </el-button>
-            </div>
-          </div>
         </div>
       </el-card>
     </section>
 
-    <section class="section-block alert-grid">
-      <div>
-        <div class="section-head">
-          <div>
-            <div class="section-head__title">实时告警流</div>
-            <div class="section-head__desc">保留 WebSocket 驱动的异常推送，作为控制台下方的动态结果区。</div>
-          </div>
-          <el-button text @click="realtimeAlerts = []" :disabled="!realtimeAlerts.length">清空</el-button>
+    <section class="section-block">
+      <div class="section-head">
+        <div>
+          <div class="section-head__title">实时告警流</div>
+          <div class="section-head__desc">保留 WebSocket 驱动的异常推送，作为控制台下方的动态结果区。</div>
         </div>
+        <el-button text @click="realtimeAlerts = []" :disabled="!realtimeAlerts.length">清空</el-button>
+      </div>
 
-        <el-card class="panel-card alert-card">
-          <div v-if="realtimeAlerts.length" class="alert-stream">
-            <div v-for="(alert, idx) in realtimeAlerts" :key="idx" class="alert-item">
-              <div class="alert-item__marker" :class="`severity-${alert.severity}`" />
-              <div class="alert-item__body">
-                <div class="alert-item__meta">
-                  <el-tag :type="severityColor(alert.severity)" size="small">{{ alert.severity }}</el-tag>
-                  <span>{{ new Date(alert.timestamp * 1000).toLocaleTimeString() }}</span>
-                </div>
-                <div class="alert-item__text">{{ alert.description }}</div>
+      <el-card class="panel-card alert-card">
+        <div v-if="realtimeAlerts.length" class="alert-stream">
+          <div v-for="(alert, idx) in realtimeAlerts" :key="idx" class="alert-item">
+            <div class="alert-item__marker" :class="`severity-${alert.severity}`" />
+            <div class="alert-item__body">
+              <div class="alert-item__meta">
+                <el-tag :type="severityColor(alert.severity)" size="small">{{ alert.severity }}</el-tag>
+                <span>{{ new Date(alert.timestamp * 1000).toLocaleTimeString() }}</span>
               </div>
+              <div class="alert-item__text">{{ alert.description }}</div>
             </div>
           </div>
-          <el-empty v-else description="当前没有新的实时告警" />
-        </el-card>
-      </div>
-
-      <div>
-        <div class="section-head">
-          <div>
-            <div class="section-head__title">最近流量记录</div>
-            <div class="section-head__desc">
-              最近 50 条记录中有 {{ visibleAttackCount }} 条为模拟攻击流量。
-            </div>
-          </div>
-          <el-button
-            plain
-            class="traffic-export-btn"
-            :icon="Download"
-            :disabled="!packets.length"
-            @click="exportRecentTraffic"
-          >
-            导出 Excel
-          </el-button>
         </div>
-
-        <el-card class="panel-card table-card">
-          <el-table
-            :data="packets"
-            stripe
-            row-class-name="traffic-table-row"
-            style="width: 100%"
-            max-height="520"
-          >
-            <el-table-column prop="protocol" label="协议" width="90" />
-            <el-table-column label="类型" width="120">
-              <template #default="{ row }">
-                <el-tag :type="row.is_attack ? 'danger' : 'success'" effect="dark">
-                  {{ attackLabel(row) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="source" label="源节点" width="130" />
-            <el-table-column prop="destination" label="目标节点" width="130" />
-            <el-table-column prop="msg_id" label="消息 ID" width="120" />
-            <el-table-column label="时间" width="190">
-              <template #default="{ row }">
-                {{ new Date(row.timestamp * 1000).toLocaleString() }}
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </div>
+        <el-empty v-else description="当前没有新的实时告警" />
+      </el-card>
     </section>
 
-    <el-dialog v-model="showPartialClean" title="按条件清理数据" width="480px">
-      <el-form label-width="100px">
+    <el-dialog
+      v-model="showPartialClean"
+      width="480px"
+      class="maintenance-dialog"
+      modal-class="maintenance-dialog-modal"
+      :show-close="false"
+    >
+      <div class="maintenance-dialog__head">
+        <div class="maintenance-dialog__title">按条件清理数据</div>
+        <button type="button" class="maintenance-dialog__close" @click="showPartialClean = false">×</button>
+      </div>
+      <el-form class="maintenance-dialog__form" label-width="100px">
         <el-form-item label="清理目标">
           <el-radio-group v-model="cleanTarget">
             <el-radio value="packets">流量报文</el-radio>
@@ -315,13 +262,25 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showPartialClean = false">取消</el-button>
-        <el-button type="danger" @click="doPartialClean">确认清理</el-button>
+        <div class="maintenance-dialog__footer">
+          <el-button class="maintenance-dialog__cancel" @click="showPartialClean = false">取消</el-button>
+          <el-button class="maintenance-dialog__danger" type="danger" @click="doPartialClean">确认清理</el-button>
+        </div>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showImportDialog" title="导入抓包文件" width="480px">
-      <el-form label-width="100px">
+    <el-dialog
+      v-model="showImportDialog"
+      width="480px"
+      class="maintenance-dialog"
+      modal-class="maintenance-dialog-modal"
+      :show-close="false"
+    >
+      <div class="maintenance-dialog__head">
+        <div class="maintenance-dialog__title">导入抓包文件</div>
+        <button type="button" class="maintenance-dialog__close" @click="showImportDialog = false">×</button>
+      </div>
+      <el-form class="maintenance-dialog__form" label-width="100px">
         <el-form-item label="文件路径">
           <el-input
             v-model="importFilePath"
@@ -333,10 +292,12 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showImportDialog = false">取消</el-button>
-        <el-button type="primary" @click="doImportFile" :loading="importLoading">
-          导入
-        </el-button>
+        <div class="maintenance-dialog__footer">
+          <el-button class="maintenance-dialog__cancel" @click="showImportDialog = false">取消</el-button>
+          <el-button class="maintenance-dialog__primary" type="primary" @click="doImportFile" :loading="importLoading">
+            导入
+          </el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -346,18 +307,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { trafficApi, anomalyApi, systemApi } from '../api/index.js'
 import { createRealtimeWs } from '../api/ws.js'
-import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import { downloadTrafficExcel, trafficAttackLabel } from '../utils/trafficExport.js'
 
 const stats = ref({ total_packets: 0, can_count: 0, eth_count: 0, v2x_count: 0 })
-const packets = ref([])
 const scenario = ref('mixed')
 const simLoading = ref(false)
 const trainingLoading = ref(false)
 const detectLoading = ref(false)
-const clearLoading = ref(false)
-const trainingResult = ref(null)
 const detectResult = ref(null)
 const showPartialClean = ref(false)
 const cleanTarget = ref('packets')
@@ -377,17 +333,17 @@ const wsState = ref('disconnected')
 const realtimeAlerts = ref([])
 let rtWs = null
 
-const wsStateTag = computed(() => ({
-  connected: 'success', connecting: 'warning', disconnected: 'danger',
-}[wsState.value] || 'info'))
-
 const wsStateLabel = computed(() => ({
   connected: 'WS 已连接', connecting: 'WS 连接中', disconnected: 'WS 断开',
 }[wsState.value] || 'WS 未知'))
-
-const visibleAttackCount = computed(() =>
-  packets.value.filter(packet => packet.is_attack).length,
-)
+const detectorStateLabel = computed(() => {
+  if (trainingLoading.value) return '训练中'
+  return trainingStatus.value.trained ? '检测器已训练' : '检测器未训练'
+})
+const detectorStateClass = computed(() => {
+  if (trainingLoading.value) return 'ws-state-chip--connecting'
+  return trainingStatus.value.trained ? 'ws-state-chip--connected' : 'ws-state-chip--disconnected'
+})
 
 const trainingStatus = ref({
   trained: false,
@@ -399,28 +355,13 @@ function severityColor(s) {
   return { critical: 'danger', high: 'warning', medium: '', low: 'info' }[s] || 'info'
 }
 
-function attackLabel(row) {
-  return trafficAttackLabel(row)
-}
-
-function exportRecentTraffic() {
-  if (!packets.value.length) {
-    ElMessage.warning('当前没有可导出的流量记录')
-    return
-  }
-  downloadTrafficExcel(packets.value)
-  ElMessage.success(`已导出 ${packets.value.length} 条最近流量记录`)
-}
-
 async function loadData() {
   try {
-    const [s, p, t] = await Promise.all([
+    const [s, t] = await Promise.all([
       trafficApi.getStats(),
-      trafficApi.getPackets({ limit: 50 }),
       anomalyApi.status(),
     ])
     stats.value = s.data
-    packets.value = p.data
     trainingStatus.value = t.data
   } catch (e) {
     console.error(e)
@@ -438,8 +379,6 @@ async function trainDetector(limit = 2000) {
         res?.data?.min_train_packets || trainingStatus.value.min_train_packets || 10,
       ),
     }
-    trainingResult.value = res.data
-
     if (res?.data?.trained) {
       ElMessage.success(
         `训练完成，使用 ${res?.data?.packet_count || 0} 条流量建立基线`,
@@ -469,10 +408,7 @@ async function simulateTraffic() {
         : `已生成 ${generated} 条模拟流量`,
     )
     if (scenario.value === 'normal') {
-      trainingResult.value = {
-        trained: trainingStatus.value.trained,
-        message: '当前为正常流量，可直接点击“训练检测器”建立基线。',
-      }
+      ElMessage.info('当前为正常流量，可直接点击“训练检测器”建立基线。')
     }
     await loadData()
   } catch {
@@ -517,60 +453,6 @@ async function runDetection() {
     ElMessage.error(detail || '执行异常检测失败')
   } finally {
     detectLoading.value = false
-  }
-}
-
-async function clearData() {
-  try {
-    await ElMessageBox.confirm('确定要清空所有数据吗？此操作不可恢复。', '清空数据', {
-      confirmButtonText: '确定清空',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-
-  clearLoading.value = true
-  try {
-    const res = await systemApi.clearData()
-    ElMessage.success(`数据已清空: ${JSON.stringify(res.data.cleared)}`)
-    detectResult.value = null
-    await loadData()
-  } catch {
-    ElMessage.error('清空数据失败')
-  } finally {
-    clearLoading.value = false
-  }
-}
-
-async function keepRecent(n) {
-  try {
-    const res = await systemApi.clearPackets({ keep_recent: n })
-    ElMessage.success(res.data.message)
-    await loadData()
-  } catch {
-    ElMessage.error('清理失败')
-  }
-}
-
-async function clearByProtocol(proto) {
-  try {
-    await ElMessageBox.confirm(
-      `确定删除所有 ${proto} 报文吗？`,
-      '按协议清理',
-      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
-    return
-  }
-
-  try {
-    const res = await systemApi.clearPackets({ protocol: proto })
-    ElMessage.success(res.data.message)
-    await loadData()
-  } catch {
-    ElMessage.error('清理失败')
   }
 }
 
@@ -680,13 +562,6 @@ function initWebSocket() {
     }
   })
 
-  rtWs.on('packets_update', (rows) => {
-    if (!Array.isArray(rows) || !rows.length) {
-      return
-    }
-    packets.value = [...rows, ...packets.value].slice(0, 50)
-  })
-
   rtWs.on('alerts', (alerts) => {
     for (const a of alerts) {
       realtimeAlerts.value.unshift(a)
@@ -696,6 +571,9 @@ function initWebSocket() {
           message: a.description,
           type: a.severity === 'critical' ? 'error' : 'warning',
           duration: 5000,
+          customClass: a.severity === 'critical'
+            ? 'gg-critical-notification'
+            : 'gg-console-notification',
         })
       }
     }
@@ -724,8 +602,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.console-grid,
-.alert-grid {
+.console-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
   gap: 18px;
@@ -737,6 +614,52 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 18px;
+}
+
+.ws-state-chip {
+  --el-tag-bg-color: rgba(61, 103, 255, 0.1);
+  --el-tag-border-color: rgba(61, 103, 255, 0.24);
+  --el-tag-text-color: #3159b8;
+  border-radius: 999px;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.ws-state-chip--connected {
+  --el-tag-bg-color: rgba(38, 139, 119, 0.1);
+  --el-tag-border-color: rgba(49, 145, 125, 0.38);
+  --el-tag-text-color: #287f72;
+}
+
+.ws-state-chip--connecting {
+  --el-tag-bg-color: rgba(168, 124, 36, 0.12);
+  --el-tag-border-color: rgba(176, 132, 45, 0.42);
+  --el-tag-text-color: #9d7320;
+}
+
+.ws-state-chip--disconnected {
+  --el-tag-bg-color: rgba(94, 20, 35, 0.14);
+  --el-tag-border-color: rgba(134, 39, 58, 0.5);
+  --el-tag-text-color: #953349;
+}
+
+:global(.shell--immersive) .ws-state-chip--connected {
+  --el-tag-bg-color: rgba(31, 112, 98, 0.22);
+  --el-tag-border-color: rgba(78, 185, 165, 0.36);
+  --el-tag-text-color: #a4e6da;
+}
+
+:global(.shell--immersive) .ws-state-chip--connecting {
+  --el-tag-bg-color: rgba(105, 78, 22, 0.26);
+  --el-tag-border-color: rgba(213, 164, 61, 0.42);
+  --el-tag-text-color: #f1d28b;
+}
+
+:global(.shell--immersive) .ws-state-chip--disconnected {
+  --el-tag-bg-color: rgba(78, 17, 32, 0.32);
+  --el-tag-border-color: rgba(176, 55, 76, 0.46);
+  --el-tag-text-color: #ebb0ba;
 }
 
 .panel-header {
@@ -773,11 +696,27 @@ onUnmounted(() => {
   background: var(--gg-surface-soft);
 }
 
+.console-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 26px;
+}
+
 .console-card__title,
 .maintenance-item__title {
   font-size: 17px;
   font-weight: 700;
   color: var(--gg-text-strong);
+}
+
+.detector-state-chip {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .console-row,
@@ -803,7 +742,15 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  margin-top: 16px;
+  margin-top: 12px;
+}
+
+.console-control-panel {
+  align-self: start;
+}
+
+.console-control-panel :deep(.el-card__body) {
+  padding-bottom: 16px;
 }
 
 .summary-box {
@@ -840,16 +787,268 @@ onUnmounted(() => {
 
 .maintenance-stack {
   display: grid;
-  gap: 16px;
+  gap: 10px;
+  align-content: start;
+}
+
+.maintenance-panel {
+  align-self: start;
+}
+
+.maintenance-panel :deep(.el-card__header) {
+  padding-bottom: 6px;
+  border-bottom: 0 !important;
+}
+
+.maintenance-panel :deep(.el-card__body) {
+  padding-top: 4px;
+  padding-bottom: 16px;
 }
 
 .maintenance-item {
   display: grid;
+  gap: 9px;
+  min-height: 112px;
+  align-content: start;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(61, 103, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.9)),
+    linear-gradient(90deg, rgba(14, 165, 183, 0.08), transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.maintenance-item__title {
+  color: #ffffff;
+  font-size: 16px;
+  text-shadow: 0 0 16px rgba(93, 215, 255, 0.18);
+}
+
+.maintenance-item__desc {
+  color: var(--gg-text-soft);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.maintenance-item :deep(.el-button) {
+  justify-self: start;
+  min-height: 38px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+:global(.shell--immersive) .maintenance-item {
+  border-color: rgba(93, 215, 255, 0.18) !important;
+  background:
+    linear-gradient(180deg, rgba(16, 34, 57, 0.82), rgba(8, 18, 32, 0.78)),
+    linear-gradient(90deg, rgba(93, 215, 255, 0.1), transparent) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 42px rgba(0, 0, 0, 0.2);
+}
+
+:global(.shell--immersive) .maintenance-item__desc {
+  color: rgba(188, 214, 248, 0.78) !important;
+}
+
+:global(.maintenance-dialog) {
+  overflow: hidden;
+  border: 1px solid rgba(93, 215, 255, 0.22);
+  border-radius: 20px;
+  background:
+    radial-gradient(420px 180px at 100% 0%, rgba(61, 103, 255, 0.18), transparent 72%),
+    radial-gradient(320px 160px at 0% 100%, rgba(14, 165, 183, 0.13), transparent 70%),
+    linear-gradient(180deg, rgba(15, 31, 52, 0.96), rgba(7, 16, 29, 0.96));
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.42),
+    0 0 34px rgba(93, 215, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+:global(.maintenance-dialog-modal) {
+  background:
+    radial-gradient(760px 420px at 50% 42%, rgba(20, 45, 76, 0.28), transparent 68%),
+    rgba(2, 7, 13, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+:global(.maintenance-dialog .el-dialog__header) {
+  display: none;
+}
+
+:global(.maintenance-dialog .el-dialog__body) {
+  padding: 0;
+  color: rgba(218, 233, 255, 0.84);
+}
+
+:global(.maintenance-dialog .el-dialog__footer) {
+  padding: 8px 22px 20px;
+}
+
+.maintenance-dialog__head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid rgba(93, 215, 255, 0.14);
+}
+
+.maintenance-dialog__head::after {
+  position: absolute;
+  left: 22px;
+  bottom: -1px;
+  width: 92px;
+  height: 1px;
+  content: '';
+  background: linear-gradient(90deg, rgba(93, 215, 255, 0.92), transparent);
+  box-shadow: 0 0 12px rgba(93, 215, 255, 0.45);
+}
+
+.maintenance-dialog__title {
+  color: #f4f8ff;
+  font-family: var(--gg-font-ui);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.maintenance-dialog__close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(93, 215, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(218, 233, 255, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.maintenance-dialog__form {
+  padding: 18px 22px 0;
+}
+
+.maintenance-dialog__form :deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+.maintenance-dialog__form :deep(.el-form-item__label) {
+  color: rgba(188, 214, 248, 0.82);
+  font-family: var(--gg-font-ui);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.maintenance-dialog__form :deep(.el-radio) {
+  --el-radio-text-color: rgba(218, 233, 255, 0.82);
+  --el-radio-input-border-color: rgba(93, 215, 255, 0.36);
+  --el-radio-checked-text-color: #f4f8ff;
+  margin-right: 18px;
+}
+
+.maintenance-dialog__form :deep(.el-radio__inner) {
+  background: rgba(6, 16, 30, 0.72);
+  border-color: rgba(93, 215, 255, 0.34);
+}
+
+.maintenance-dialog__form :deep(.el-radio__input.is-checked .el-radio__inner) {
+  border-color: rgba(93, 215, 255, 0.95);
+  background: #5dd7ff;
+  box-shadow: 0 0 14px rgba(93, 215, 255, 0.45);
+}
+
+.maintenance-dialog__form :deep(.el-input__wrapper),
+.maintenance-dialog__form :deep(.el-select__wrapper),
+.maintenance-dialog__form :deep(.el-input-number),
+.maintenance-dialog__form :deep(.el-input-number .el-input__wrapper) {
+  border: 1px solid rgba(93, 215, 255, 0.18);
+  background: rgba(4, 13, 25, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(61, 103, 255, 0.08);
+}
+
+.maintenance-dialog__form :deep(.el-input__wrapper.is-focus),
+.maintenance-dialog__form :deep(.el-select__wrapper.is-focused) {
+  border-color: rgba(93, 215, 255, 0.58);
+  box-shadow:
+    0 0 0 1px rgba(93, 215, 255, 0.2),
+    0 0 18px rgba(93, 215, 255, 0.14);
+}
+
+.maintenance-dialog__form :deep(.el-input__inner),
+.maintenance-dialog__form :deep(.el-select__placeholder),
+.maintenance-dialog__form :deep(.el-input-number .el-input__inner) {
+  color: #f4f8ff;
+}
+
+.maintenance-dialog__form :deep(.el-input__inner::placeholder) {
+  color: rgba(188, 214, 248, 0.46);
+}
+
+.maintenance-dialog__form :deep(.el-input-number__decrease),
+.maintenance-dialog__form :deep(.el-input-number__increase) {
+  border-color: rgba(93, 215, 255, 0.16);
+  color: rgba(188, 214, 248, 0.78);
+  background:
+    linear-gradient(180deg, rgba(18, 42, 70, 0.92), rgba(8, 19, 34, 0.92));
+}
+
+.maintenance-dialog__form :deep(.el-input-number__decrease:hover),
+.maintenance-dialog__form :deep(.el-input-number__increase:hover) {
+  color: #5dd7ff;
+  background:
+    linear-gradient(180deg, rgba(35, 78, 121, 0.92), rgba(13, 35, 59, 0.92));
+}
+
+.maintenance-dialog__form :deep(.el-input-number__decrease.is-disabled),
+.maintenance-dialog__form :deep(.el-input-number__increase.is-disabled) {
+  color: rgba(188, 214, 248, 0.32);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.maintenance-dialog__form .dialog-tip {
+  color: rgba(188, 214, 248, 0.78);
+}
+
+.maintenance-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid var(--gg-line);
-  background: var(--gg-surface-soft);
+}
+
+.maintenance-dialog__footer :deep(.el-button) {
+  min-width: 96px;
+  min-height: 38px;
+  margin-left: 0;
+  border-radius: 999px;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.maintenance-dialog__cancel {
+  border-color: rgba(188, 214, 248, 0.22) !important;
+  color: rgba(218, 233, 255, 0.82) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.maintenance-dialog__primary {
+  border-color: rgba(93, 215, 255, 0.5) !important;
+  background: linear-gradient(135deg, rgba(47, 104, 255, 0.92), rgba(14, 165, 183, 0.84)) !important;
+  box-shadow: 0 0 22px rgba(93, 215, 255, 0.18);
+}
+
+.maintenance-dialog__danger {
+  border-color: rgba(255, 99, 125, 0.42) !important;
+  background: linear-gradient(135deg, rgba(122, 22, 41, 0.94), rgba(190, 48, 72, 0.78)) !important;
+  box-shadow: 0 0 22px rgba(217, 75, 101, 0.18);
 }
 
 .alert-card :deep(.el-card__body) {
@@ -911,7 +1110,6 @@ onUnmounted(() => {
 
 @media (max-width: 1180px) {
   .console-grid,
-  .alert-grid,
   .console-cards,
   .console-summary {
     grid-template-columns: 1fr;

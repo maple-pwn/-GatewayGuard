@@ -13,11 +13,11 @@
           帮助研究人员和分析员更高效地识别攻击行为、追踪异常来源并完成安全态势评估。
         </p>
         <div class="hero__actions">
-          <button type="button" class="hero__cta hero__cta--primary" @click="enterMode('immersive')">
+          <button type="button" class="hero__cta hero__cta--primary" @click="enterConsole">
             Enter Official Console
           </button>
-          <button type="button" class="hero__cta" @click="enterMode('simple')">
-            Enter Simple Console
+          <button type="button" class="hero__cta" @click="enterAbout">
+            About Our GatewayGuard
           </button>
         </div>
       </div>
@@ -30,9 +30,14 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-function enterMode(mode) {
-  window.localStorage.setItem('gg-ui-mode', mode)
-  router.push(`/${mode}/console`)
+function enterConsole() {
+  window.localStorage.setItem('gg-ui-mode', 'immersive')
+  router.push('/immersive/console')
+}
+
+function enterAbout() {
+  window.localStorage.setItem('gg-ui-mode', 'immersive')
+  router.push('/immersive/about')
 }
 </script>
 

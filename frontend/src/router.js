@@ -6,11 +6,7 @@ import Anomaly from './views/Anomaly.vue'
 import About from './views/About.vue'
 
 function resolveModeRoute(section) {
-  if (typeof window === 'undefined') {
-    return `/immersive/${section}`
-  }
-  const mode = window.localStorage.getItem('gg-ui-mode') || 'immersive'
-  return `/${mode}/${section}`
+  return `/immersive/${section}`
 }
 
 const routes = [
@@ -24,30 +20,7 @@ const routes = [
   { path: '/console', redirect: () => resolveModeRoute('console') },
   { path: '/events', redirect: () => resolveModeRoute('events') },
   { path: '/about', redirect: () => resolveModeRoute('about') },
-  {
-    path: '/simple/assistant',
-    name: 'SimpleAssistant',
-    component: Chat,
-    meta: { shell: 'simple', section: 'assistant' },
-  },
-  {
-    path: '/simple/console',
-    name: 'SimpleConsole',
-    component: Dashboard,
-    meta: { shell: 'simple', section: 'console' },
-  },
-  {
-    path: '/simple/events',
-    name: 'SimpleEvents',
-    component: Anomaly,
-    meta: { shell: 'simple', section: 'events' },
-  },
-  {
-    path: '/simple/about',
-    name: 'SimpleAbout',
-    component: About,
-    meta: { shell: 'simple', section: 'about' },
-  },
+  { path: '/simple/:section', redirect: (to) => `/immersive/${to.params.section}` },
   {
     path: '/immersive/assistant',
     name: 'ImmersiveAssistant',

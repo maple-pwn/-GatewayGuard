@@ -3,7 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text, select, func
+from sqlalchemy import text, select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -67,6 +67,9 @@ async def clear_all_data(db: AsyncSession = Depends(get_db)):
 async def clear_packets_partial(
     protocol: Optional[str] = Query(None, description="按协议删除: CAN/ETH/V2X"),
     keep_recent: Optional[int] = Query(None, description="只保留最近N条，删除其余"),
+    start_time: Optional[float] = Query(None, description="按时间段删除：起始时间戳，秒"),
+    end_time: Optional[float] = Query(None, description="按时间段删除：结束时间戳，秒"),
+    all_records: bool = Query(False, description="清空全部流量报文"),
     db: AsyncSession = Depends(get_db),
 ):
     """按条件部分清理流量数据"""
@@ -74,6 +77,10 @@ async def clear_packets_partial(
     count_q = select(func.count()).select_from(PacketORM)
     if protocol:
         count_q = count_q.where(PacketORM.protocol == protocol.upper())
+    if start_time is not None:
+        count_q = count_q.where(PacketORM.timestamp >= start_time)
+    if end_time is not None:
+        count_q = count_q.where(PacketORM.timestamp <= end_time)
     before = int((await db.execute(count_q)).scalar() or 0)
 
     if keep_recent and keep_recent > 0:
@@ -90,13 +97,17 @@ async def clear_packets_partial(
                 text("DELETE FROM packets WHERE id <= :cutoff"),
                 {"cutoff": cutoff_row},
             )
-    elif protocol:
-        await db.execute(
-            text("DELETE FROM packets WHERE protocol = :proto"),
-            {"proto": protocol.upper()},
-        )
+    elif all_records or protocol or start_time is not None or end_time is not None:
+        delete_stmt = delete(PacketORM)
+        if protocol:
+            delete_stmt = delete_stmt.where(PacketORM.protocol == protocol.upper())
+        if start_time is not None:
+            delete_stmt = delete_stmt.where(PacketORM.timestamp >= start_time)
+        if end_time is not None:
+            delete_stmt = delete_stmt.where(PacketORM.timestamp <= end_time)
+        await db.execute(delete_stmt)
     else:
-        return {"error": "请指定 protocol 或 keep_recent 参数"}
+        return {"error": "请指定 protocol、时间段、keep_recent 或 all_records 参数"}
 
     await db.commit()
 
@@ -116,13 +127,26 @@ async def clear_anomalies_partial(
     severity: Optional[str] = Query(
         None, description="按严重程度删除: critical/high/medium/low"
     ),
+    status: Optional[str] = Query(None, description="按状态删除: open/investigating/resolved"),
+    protocol: Optional[str] = Query(None, description="按协议删除: CAN/ETH/V2X"),
     keep_recent: Optional[int] = Query(None, description="只保留最近N条"),
+    start_time: Optional[float] = Query(None, description="按时间段删除：起始时间戳，秒"),
+    end_time: Optional[float] = Query(None, description="按时间段删除：结束时间戳，秒"),
+    all_records: bool = Query(False, description="清空全部异常事件"),
     db: AsyncSession = Depends(get_db),
 ):
     """按条件部分清理异常事件"""
     count_q = select(func.count()).select_from(AnomalyEventORM)
     if severity:
         count_q = count_q.where(AnomalyEventORM.severity == severity)
+    if status:
+        count_q = count_q.where(AnomalyEventORM.status == status)
+    if protocol:
+        count_q = count_q.where(AnomalyEventORM.protocol == protocol.upper())
+    if start_time is not None:
+        count_q = count_q.where(AnomalyEventORM.timestamp >= start_time)
+    if end_time is not None:
+        count_q = count_q.where(AnomalyEventORM.timestamp <= end_time)
     before = int((await db.execute(count_q)).scalar() or 0)
 
     if keep_recent and keep_recent > 0:
@@ -138,13 +162,21 @@ async def clear_anomalies_partial(
                 text("DELETE FROM anomaly_events WHERE id <= :cutoff"),
                 {"cutoff": cutoff_row},
             )
-    elif severity:
-        await db.execute(
-            text("DELETE FROM anomaly_events WHERE severity = :sev"),
-            {"sev": severity},
-        )
+    elif all_records or severity or status or protocol or start_time is not None or end_time is not None:
+        delete_stmt = delete(AnomalyEventORM)
+        if severity:
+            delete_stmt = delete_stmt.where(AnomalyEventORM.severity == severity)
+        if status:
+            delete_stmt = delete_stmt.where(AnomalyEventORM.status == status)
+        if protocol:
+            delete_stmt = delete_stmt.where(AnomalyEventORM.protocol == protocol.upper())
+        if start_time is not None:
+            delete_stmt = delete_stmt.where(AnomalyEventORM.timestamp >= start_time)
+        if end_time is not None:
+            delete_stmt = delete_stmt.where(AnomalyEventORM.timestamp <= end_time)
+        await db.execute(delete_stmt)
     else:
-        return {"error": "请指定 severity 或 keep_recent 参数"}
+        return {"error": "请指定 severity、status、protocol、时间段、keep_recent 或 all_records 参数"}
 
     await db.commit()
 

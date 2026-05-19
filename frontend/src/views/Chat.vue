@@ -55,7 +55,7 @@
         />
         <div class="composer-actions">
           <span>Enter 发送，Shift + Enter 换行</span>
-          <el-button type="primary" @click="sendMessage" :loading="loading">
+          <el-button class="send-message-btn" type="primary" @click="sendMessage" :loading="loading">
             发送消息
           </el-button>
         </div>
@@ -295,14 +295,41 @@ onUnmounted(() => {
   max-width: min(760px, 84%);
   padding: 16px 18px;
   border-radius: 20px;
-  border: 1px solid var(--gg-line);
-  background: #fff;
+  border: 1px solid rgba(84, 123, 184, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 255, 0.84)),
+    linear-gradient(90deg, rgba(14, 165, 183, 0.06), transparent);
+  box-shadow: 0 14px 34px rgba(18, 32, 56, 0.08);
 }
 
 .message-row--user .message-bubble {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(180deg, var(--gg-primary), var(--gg-primary-2));
+  position: relative;
+  overflow: hidden;
+  color: #f5f9ff;
+  border-color: rgba(93, 215, 255, 0.34);
+  background:
+    linear-gradient(135deg, rgba(18, 45, 83, 0.94), rgba(16, 72, 94, 0.86)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.07) 0, rgba(93, 215, 255, 0.07) 1px, transparent 1px, transparent 22px),
+    radial-gradient(260px 140px at 0% 0%, rgba(93, 215, 255, 0.22), transparent 68%);
+  box-shadow:
+    0 16px 36px rgba(13, 44, 76, 0.22),
+    0 0 24px rgba(93, 215, 255, 0.1);
+}
+
+.message-row--user .message-bubble::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(93, 215, 255, 0.18), transparent 38%, rgba(61, 103, 255, 0.12));
+  content: '';
+  opacity: 0.72;
+}
+
+.message-row--user .message-bubble__role,
+.message-row--user .message-bubble__text {
+  position: relative;
+  z-index: 1;
 }
 
 .message-bubble__role {
@@ -348,6 +375,42 @@ onUnmounted(() => {
   gap: 12px;
   color: var(--gg-text-soft);
   font-size: 12px;
+}
+
+.send-message-btn {
+  --el-button-bg-color: rgba(45, 83, 210, 0.92);
+  --el-button-border-color: rgba(93, 215, 255, 0.28);
+  --el-button-hover-bg-color: rgba(63, 111, 238, 0.96);
+  --el-button-hover-border-color: rgba(119, 225, 255, 0.46);
+  --el-button-active-bg-color: rgba(35, 72, 174, 0.96);
+  min-width: 124px;
+  min-height: 42px;
+  border-radius: 999px;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  box-shadow:
+    0 14px 30px rgba(45, 83, 210, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+:global(.shell--immersive) .message-bubble {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
+    linear-gradient(90deg, rgba(93, 215, 255, 0.08), transparent) !important;
+  border-color: rgba(136, 183, 255, 0.14) !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
+}
+
+:global(.shell--immersive) .message-row--user .message-bubble {
+  background:
+    linear-gradient(135deg, rgba(22, 51, 88, 0.82), rgba(13, 73, 88, 0.64)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.06) 0, rgba(93, 215, 255, 0.06) 1px, transparent 1px, transparent 22px),
+    radial-gradient(260px 140px at 0% 0%, rgba(93, 215, 255, 0.22), transparent 68%) !important;
+  border-color: rgba(93, 215, 255, 0.3) !important;
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.24),
+    0 0 26px rgba(93, 215, 255, 0.08) !important;
 }
 
 @media (max-width: 1080px) {

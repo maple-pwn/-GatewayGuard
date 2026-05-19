@@ -64,15 +64,6 @@ a {
   min-height: 100vh;
 }
 
-.shell--simple {
-  --gg-font-display: "Trebuchet MS", "Avenir Next", "PingFang SC", sans-serif;
-  --gg-font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --gg-font-metric: "Avenir Next", "Trebuchet MS", "PingFang SC", sans-serif;
-  background:
-    radial-gradient(900px 420px at 0% 0%, #dbe7ff 0%, transparent 60%),
-    linear-gradient(180deg, #f8fbff 0%, var(--gg-bg) 100%);
-}
-
 .sidebar {
   position: sticky;
   top: 0;
@@ -95,16 +86,20 @@ a {
 }
 
 .brand-mark {
+  position: relative;
   display: grid;
   place-items: center;
   width: 46px;
   height: 46px;
-  border-radius: 16px;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  font-family: var(--gg-font-display);
-  background: linear-gradient(180deg, #4a74ff, #2e58e6);
+}
+
+.brand-mark__icon {
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(93, 215, 255, 0.34));
 }
 
 .brand-title {
@@ -433,9 +428,23 @@ a {
   color: #8ec5ff !important;
 }
 
-.shell--immersive .metric-card__value,
+.shell--immersive .console-card__title {
+  color: #7dd3fc !important;
+  text-shadow: 0 0 14px rgba(93, 215, 255, 0.18) !important;
+}
+
+.shell--immersive .maintenance-item__title {
+  color: #8fdcff !important;
+  text-shadow: 0 0 14px rgba(93, 215, 255, 0.16) !important;
+}
+
 .shell--immersive .status-v,
-.shell--immersive .summary-box strong,
+.shell--immersive .summary-box strong {
+  color: #b8dcf2 !important;
+  text-shadow: 0 0 10px rgba(93, 215, 255, 0.1) !important;
+}
+
+.shell--immersive .metric-card__value,
 .shell--immersive .status-item strong,
 .shell--immersive .pulse-core strong {
   color: #f7fbff !important;
@@ -587,6 +596,76 @@ a {
 .shell--immersive .filter-action {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.gg-critical-notification {
+  border: 1px solid rgba(255, 98, 124, 0.58) !important;
+  background:
+    linear-gradient(135deg, rgba(55, 9, 19, 0.95), rgba(12, 21, 38, 0.94)),
+    radial-gradient(220px 90px at 18% 0%, rgba(255, 92, 122, 0.28), transparent 70%) !important;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.38),
+    0 0 34px rgba(255, 61, 96, 0.28) !important;
+  backdrop-filter: blur(16px);
+}
+
+.gg-critical-notification .el-notification__title {
+  color: #fff7f9 !important;
+  font-family: var(--gg-font-display);
+  letter-spacing: 0.04em;
+}
+
+.gg-critical-notification .el-notification__content {
+  color: rgba(255, 225, 232, 0.9) !important;
+  font-family: var(--gg-font-ui);
+}
+
+.gg-critical-notification .el-notification__icon,
+.gg-critical-notification .el-notification__closeBtn {
+  color: #ff6b86 !important;
+}
+
+.gg-console-notification,
+.el-message {
+  border: 1px solid rgba(93, 215, 255, 0.24) !important;
+  background:
+    linear-gradient(135deg, rgba(8, 18, 32, 0.95), rgba(14, 31, 50, 0.94)),
+    radial-gradient(220px 90px at 18% 0%, rgba(93, 215, 255, 0.2), transparent 70%) !important;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.32),
+    0 0 28px rgba(93, 215, 255, 0.16) !important;
+  backdrop-filter: blur(16px);
+}
+
+.gg-console-notification .el-notification__title,
+.el-message .el-message__content {
+  color: #edf6ff !important;
+  font-family: var(--gg-font-ui);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.gg-console-notification .el-notification__content {
+  color: rgba(219, 235, 255, 0.86) !important;
+  font-family: var(--gg-font-ui);
+}
+
+.gg-console-notification .el-notification__icon,
+.gg-console-notification .el-notification__closeBtn,
+.el-message .el-message__icon {
+  color: #5dd7ff !important;
+}
+
+.el-message.el-message--success {
+  border-color: rgba(78, 185, 165, 0.34) !important;
+}
+
+.el-message.el-message--warning {
+  border-color: rgba(213, 164, 61, 0.38) !important;
+}
+
+.el-message.el-message--error {
+  border-color: rgba(194, 69, 92, 0.42) !important;
 }
 
 .shell--immersive .message-bubble,

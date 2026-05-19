@@ -8,77 +8,20 @@
       </router-view>
     </div>
 
-    <div v-else-if="isSimpleMode" key="simple" class="shell shell--simple">
-      <aside class="sidebar">
-        <div class="brand-block">
-          <div class="brand-mark">GG</div>
-          <div>
-            <div class="brand-title">GatewayGuard</div>
-            <div class="brand-subtitle">Security Console</div>
-          </div>
-        </div>
-
-        <div class="status-stack">
-          <div class="status-card">
-            <div class="status-k">报文数量</div>
-            <div class="status-v">{{ sidebarStats.totalPackets }}</div>
-          </div>
-          <div class="status-card">
-            <div class="status-k">异常事件</div>
-            <div class="status-v">{{ sidebarStats.alertCount }}</div>
-          </div>
-        </div>
-
-        <nav class="nav-stack">
-          <button
-            v-for="item in navItems"
-            :key="item.section"
-            type="button"
-            class="nav-btn"
-            :class="{ active: currentSection === item.section }"
-            @click="goToSection(item.section)"
-          >
-            <el-icon><component :is="item.icon" /></el-icon>
-            <span>{{ item.label }}</span>
-          </button>
-        </nav>
-
-        <div class="sidebar-foot">
-          <div>
-            <div class="sidebar-foot__label">页面说明</div>
-            <div class="sidebar-foot__text">{{ currentMeta.caption }}</div>
-          </div>
-          <button type="button" class="sidebar-switch" @click="switchMode('immersive')">切换至正式版</button>
-          <div class="sidebar-clock">{{ clockLabel }}</div>
-        </div>
-      </aside>
-
-      <main class="workspace">
-        <section v-if="showWorkspaceHead" class="workspace-head">
-          <div>
-            <div class="workspace-eyebrow">{{ currentMeta.eyebrow }}</div>
-            <h1>{{ currentMeta.title }}</h1>
-            <p>{{ currentMeta.description }}</p>
-          </div>
-        </section>
-
-        <section class="workspace-body">
-          <router-view v-slot="{ Component, route: viewRoute }">
-            <Transition name="simple-route" mode="out-in">
-              <component :is="Component" :key="viewRoute.fullPath" />
-            </Transition>
-          </router-view>
-        </section>
-      </main>
-    </div>
-
-    <div v-else key="immersive" class="shell shell--immersive">
+    <div
+      v-else
+      key="immersive"
+      class="shell shell--immersive"
+      :class="{ 'shell--critical-alert': criticalFrameActive }"
+    >
       <div class="immersive-backdrop" />
       <div class="immersive-veil" />
 
       <header class="immersive-topbar">
         <div class="immersive-brand">
-          <div class="brand-mark">GG</div>
+          <div class="brand-mark">
+            <img :src="brandIcon" alt="GatewayGuard" class="brand-mark__icon" />
+          </div>
           <div>
             <div class="brand-title">GatewayGuard</div>
             <div class="brand-subtitle">Official Security Console</div>
@@ -99,7 +42,12 @@
           </button>
         </nav>
 
-        <button type="button" class="mode-switch" @click="switchMode('simple')">切换至简洁版</button>
+        <div class="immersive-topbar__clock" aria-label="本地时间">
+          <div class="immersive-topbar__clock-inner">
+            <span class="immersive-topbar__clock-label">LOCAL TIME</span>
+            <strong>{{ clockLabel }}</strong>
+          </div>
+        </div>
       </header>
 
       <main class="immersive-workspace">
@@ -130,7 +78,7 @@
               </div>
             </section>
 
-            <div class="immersive-pulse">
+            <div class="immersive-pulse" :class="`immersive-pulse--${riskLevelTone}`">
               <div class="pulse-ring pulse-ring--lg" />
               <div class="pulse-ring pulse-ring--sm" />
               <div class="pulse-core" :class="`pulse-core--${riskLevelTone}`">
@@ -156,8 +104,10 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElNotification } from 'element-plus'
 import { ChatDotRound, Cpu, House, InfoFilled, WarningFilled } from '@element-plus/icons-vue'
 import { anomalyApi, trafficApi } from './api/index.js'
+import brandIcon from './assets/icon.png'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,14 +124,14 @@ const metaMap = {
   landing: {
     eyebrow: 'GatewayGuard',
     title: '平台首页',
-    description: '以主视觉首页承接平台定位、运行状态和双版本入口，作为 PC 端统一入口。',
+    description: '以主视觉首页承接平台定位、运行状态和控制台入口，作为 PC 端统一入口。',
     caption: '总览、入口与运行快照',
     short: 'HOME',
   },
   assistant: {
     eyebrow: 'AI Assistant',
     title: 'AI 助手',
-    description: '保持现有 LLM 对话能力，并在正式版中扩展为沉浸式分析工作区。',
+    description: '保持现有 LLM 对话能力，并扩展为沉浸式分析工作区。',
     caption: '对话、追问与处置建议',
     short: 'LLM',
   },
@@ -202,7 +152,7 @@ const metaMap = {
   about: {
     eyebrow: 'Platform Info',
     title: '关于我们',
-    description: '展示平台定位、当前后端状态和桌面端的双版本信息架构说明。',
+    description: '展示平台定位、当前后端状态和桌面端信息架构说明。',
     caption: '系统概览与版本说明',
     short: 'INFO',
   },
@@ -213,12 +163,14 @@ const sidebarStats = ref({
   alertCount: 0,
 })
 const riskLevel = ref('none')
+const criticalFrameActive = ref(false)
 const clockLabel = ref('--:--')
 let refreshTimer = null
 let clockTimer = null
+let criticalFrameTimer = null
+let lastCriticalAlertKey = ''
 
 const isStandaloneHome = computed(() => route.meta.shell === 'landing' || route.path === '/')
-const isSimpleMode = computed(() => route.meta.shell === 'simple')
 const currentShell = computed(() => route.meta.shell || 'landing')
 const currentSection = computed(() => route.meta.section || 'home')
 const currentMeta = computed(() => {
@@ -258,6 +210,16 @@ function pickHighestSeverity(items) {
   return 'none'
 }
 
+function latestCriticalAlertKey(items) {
+  const critical = items.find((item) => item?.severity === 'critical')
+  if (!critical) return ''
+  return String(
+    critical.event_id
+      || critical.id
+      || `${critical.timestamp || ''}-${critical.anomaly_type || ''}-${critical.source_node || ''}-${critical.target_node || ''}`,
+  )
+}
+
 function persistMode(mode) {
   if (typeof window !== 'undefined') {
     window.localStorage.setItem('gg-ui-mode', mode)
@@ -273,16 +235,30 @@ function goToSection(section) {
   router.push(sectionPath(section))
 }
 
-function switchMode(mode) {
-  persistMode(mode)
-  router.push(sectionPath(currentSection.value, mode))
-}
-
 function updateClock() {
   const now = new Date()
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
   clockLabel.value = `${hh}:${mm}`
+}
+
+function triggerCriticalAlert() {
+  criticalFrameActive.value = true
+  if (criticalFrameTimer) clearTimeout(criticalFrameTimer)
+  criticalFrameTimer = setTimeout(() => {
+    criticalFrameActive.value = false
+    criticalFrameTimer = null
+  }, 5000)
+
+  ElNotification({
+    title: '严重风险流量',
+    message: '检测到严重风险流量',
+    type: 'error',
+    position: 'top-right',
+    duration: 5000,
+    customClass: 'gg-critical-notification',
+    showClose: true,
+  })
 }
 
 async function refreshSidebarStats() {
@@ -295,7 +271,16 @@ async function refreshSidebarStats() {
       totalPackets: statsRes?.data?.total_packets || 0,
       alertCount: anomalyRes?.data?.total || 0,
     }
-    riskLevel.value = pickHighestSeverity(anomalyRes?.data?.items || anomalyRes?.data?.events || anomalyRes?.data || [])
+    const anomalyItems = anomalyRes?.data?.items || anomalyRes?.data?.events || anomalyRes?.data || []
+    riskLevel.value = pickHighestSeverity(anomalyItems)
+
+    const criticalKey = latestCriticalAlertKey(anomalyItems)
+    if (criticalKey && criticalKey !== lastCriticalAlertKey) {
+      lastCriticalAlertKey = criticalKey
+      triggerCriticalAlert()
+    } else if (!criticalKey) {
+      lastCriticalAlertKey = ''
+    }
   } catch {
     // Keep shell usable even when summary requests fail.
     riskLevel.value = 'none'
@@ -305,7 +290,7 @@ async function refreshSidebarStats() {
 watch(
   () => currentShell.value,
   (shell) => {
-    if (shell === 'simple' || shell === 'immersive') {
+    if (shell === 'immersive') {
       persistMode(shell)
     }
   },
@@ -322,6 +307,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
   if (refreshTimer) clearInterval(refreshTimer)
+  if (criticalFrameTimer) clearTimeout(criticalFrameTimer)
 })
 </script>
 
@@ -334,8 +320,6 @@ onUnmounted(() => {
 
 .landing-route-enter-active,
 .landing-route-leave-active,
-.simple-route-enter-active,
-.simple-route-leave-active,
 .immersive-route-enter-active,
 .immersive-route-leave-active {
   transition:
@@ -351,13 +335,6 @@ onUnmounted(() => {
   filter: blur(8px);
 }
 
-.simple-route-enter-from,
-.simple-route-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-  filter: blur(6px);
-}
-
 .immersive-route-enter-from,
 .immersive-route-leave-to {
   opacity: 0;
@@ -367,8 +344,6 @@ onUnmounted(() => {
 
 .landing-route-enter-to,
 .landing-route-leave-from,
-.simple-route-enter-to,
-.simple-route-leave-from,
 .immersive-route-enter-to,
 .immersive-route-leave-from {
   opacity: 1;
@@ -377,7 +352,6 @@ onUnmounted(() => {
 }
 
 .landing-route-leave-active,
-.simple-route-leave-active,
 .immersive-route-leave-active {
   position: absolute;
   inset: 0;
@@ -412,8 +386,6 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.sidebar-switch,
-.mode-switch,
 .immersive-nav__btn {
   display: inline-flex;
   align-items: center;
@@ -433,8 +405,6 @@ onUnmounted(() => {
   transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.sidebar-switch:hover,
-.mode-switch:hover,
 .immersive-nav__btn:hover,
 .immersive-nav__btn.active {
   transform: translateY(-1px);
@@ -471,6 +441,26 @@ onUnmounted(() => {
   color: #eef4ff;
 }
 
+.shell--immersive::after {
+  position: fixed;
+  inset: 10px;
+  z-index: 12;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  content: '';
+  opacity: 0;
+}
+
+.shell--critical-alert::after {
+  border-color: rgba(255, 82, 112, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(255, 211, 220, 0.2) inset,
+    0 0 26px rgba(255, 61, 96, 0.46),
+    0 0 70px rgba(255, 61, 96, 0.24);
+  animation: criticalFramePulse 1s ease-in-out infinite;
+}
+
 .immersive-topbar {
   position: relative;
   z-index: 1;
@@ -478,7 +468,7 @@ onUnmounted(() => {
 
 .immersive-topbar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 20px;
   padding: 18px 24px 0;
@@ -498,6 +488,46 @@ onUnmounted(() => {
   justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.immersive-topbar__clock {
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(93, 215, 255, 0.18);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(15, 31, 52, 0.72), rgba(7, 16, 29, 0.72)),
+    linear-gradient(90deg, rgba(93, 215, 255, 0.12), transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 26px rgba(0, 0, 0, 0.22);
+  color: rgba(218, 233, 255, 0.9);
+}
+
+.immersive-topbar__clock-inner {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.immersive-topbar__clock-label {
+  color: rgba(188, 214, 248, 0.58);
+  font-size: 11px;
+  font-family: var(--gg-font-ui);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.immersive-topbar__clock strong {
+  color: #eaf4ff;
+  font-size: 18px;
+  font-family: var(--gg-font-metric);
+  letter-spacing: 0.06em;
+  line-height: 1;
 }
 
 .immersive-workspace {
@@ -558,6 +588,12 @@ onUnmounted(() => {
 }
 
 .immersive-pulse {
+  --pulse-ring: rgba(159, 190, 255, 0.68);
+  --pulse-fill: rgba(140, 176, 255, 0.08);
+  --pulse-line: rgba(140, 176, 255, 0.2);
+  --pulse-accent: rgba(125, 233, 214, 0.14);
+  --pulse-glow: rgba(111, 151, 255, 0.34);
+  --pulse-glow-strong: rgba(125, 233, 214, 0.16);
   position: relative;
   display: grid;
   place-items: center;
@@ -571,8 +607,60 @@ onUnmounted(() => {
 }
 
 .pulse-ring {
-  border: 1px solid rgba(134, 164, 255, 0.26);
+  border: 2px solid var(--pulse-ring);
+  background:
+    radial-gradient(circle, var(--pulse-fill) 0 54%, var(--pulse-line) 55% 56%, transparent 58%),
+    radial-gradient(circle, transparent 60%, var(--pulse-accent) 61% 63%, transparent 66%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16) inset,
+    0 0 22px var(--pulse-glow),
+    0 0 46px var(--pulse-glow-strong);
   animation: pulseRing 3.6s ease-in-out infinite;
+}
+
+.immersive-pulse--critical {
+  --pulse-ring: rgba(255, 123, 146, 0.78);
+  --pulse-fill: rgba(255, 93, 124, 0.1);
+  --pulse-line: rgba(255, 93, 124, 0.26);
+  --pulse-accent: rgba(255, 188, 203, 0.18);
+  --pulse-glow: rgba(255, 93, 124, 0.42);
+  --pulse-glow-strong: rgba(255, 74, 113, 0.22);
+}
+
+.immersive-pulse--high {
+  --pulse-ring: rgba(255, 180, 105, 0.76);
+  --pulse-fill: rgba(255, 165, 72, 0.1);
+  --pulse-line: rgba(255, 165, 72, 0.25);
+  --pulse-accent: rgba(255, 219, 158, 0.16);
+  --pulse-glow: rgba(255, 165, 72, 0.38);
+  --pulse-glow-strong: rgba(255, 137, 43, 0.2);
+}
+
+.immersive-pulse--medium {
+  --pulse-ring: rgba(255, 216, 111, 0.76);
+  --pulse-fill: rgba(255, 214, 79, 0.1);
+  --pulse-line: rgba(255, 214, 79, 0.24);
+  --pulse-accent: rgba(255, 241, 167, 0.16);
+  --pulse-glow: rgba(255, 214, 79, 0.36);
+  --pulse-glow-strong: rgba(255, 197, 45, 0.18);
+}
+
+.immersive-pulse--low {
+  --pulse-ring: rgba(89, 216, 178, 0.76);
+  --pulse-fill: rgba(89, 216, 178, 0.1);
+  --pulse-line: rgba(89, 216, 178, 0.24);
+  --pulse-accent: rgba(151, 242, 219, 0.16);
+  --pulse-glow: rgba(89, 216, 178, 0.36);
+  --pulse-glow-strong: rgba(70, 221, 190, 0.18);
+}
+
+.immersive-pulse--none {
+  --pulse-ring: rgba(159, 190, 255, 0.68);
+  --pulse-fill: rgba(140, 176, 255, 0.08);
+  --pulse-line: rgba(140, 176, 255, 0.2);
+  --pulse-accent: rgba(125, 233, 214, 0.14);
+  --pulse-glow: rgba(111, 151, 255, 0.34);
+  --pulse-glow-strong: rgba(125, 233, 214, 0.16);
 }
 
 .pulse-ring--lg {
@@ -740,11 +828,23 @@ onUnmounted(() => {
   0%,
   100% {
     transform: scale(0.96);
-    opacity: 0.38;
+    opacity: 0.72;
   }
   50% {
     transform: scale(1.04);
     opacity: 1;
+  }
+}
+
+@keyframes criticalFramePulse {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: scale(0.998);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -775,6 +875,11 @@ onUnmounted(() => {
     justify-content: flex-start;
   }
 
+  .immersive-topbar__clock {
+    justify-self: start;
+    width: fit-content;
+  }
+
   .immersive-pulse {
     height: 160px;
   }
@@ -796,6 +901,11 @@ onUnmounted(() => {
   .immersive-workspace {
     padding-left: 14px;
     padding-right: 14px;
+  }
+
+  .immersive-topbar__clock {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .immersive-stats {
