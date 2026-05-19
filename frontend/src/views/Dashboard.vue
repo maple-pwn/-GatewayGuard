@@ -143,14 +143,6 @@
           </div>
         </div>
 
-        <div v-if="detectResult" class="console-result">
-          <el-alert
-            :title="`检测完成，发现 ${detectResult.detected} 个异常`"
-            :type="detectResult.detected > 0 ? 'warning' : 'success'"
-            show-icon
-            :closable="false"
-          />
-        </div>
       </el-card>
 
       <el-card class="panel-card maintenance-panel">
@@ -314,7 +306,6 @@ const scenario = ref('mixed')
 const simLoading = ref(false)
 const trainingLoading = ref(false)
 const detectLoading = ref(false)
-const detectResult = ref(null)
 const showPartialClean = ref(false)
 const cleanTarget = ref('packets')
 const cleanMode = ref('keep_recent')
@@ -422,7 +413,6 @@ async function runDetection() {
   detectLoading.value = true
   try {
     const res = await anomalyApi.detect(500)
-    detectResult.value = res.data
     ElMessage.success(`检测完成，发现 ${res?.data?.detected ?? 0} 个异常`)
   } catch (e) {
     const status = e?.response?.status
@@ -779,10 +769,6 @@ onUnmounted(() => {
   color: var(--gg-text-soft);
   line-height: 1.7;
   font-size: 13px;
-}
-
-.console-result {
-  margin-top: 16px;
 }
 
 .maintenance-stack {
