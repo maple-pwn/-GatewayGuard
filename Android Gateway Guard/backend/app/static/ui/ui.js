@@ -491,7 +491,7 @@ async function saveApiKey() {
   try {
     const data = await req("/api/system/api-key", "POST", {
       api_key: apiKey,
-      provider: "openai"
+      provider: "deepseek"
     });
     switchPage("console");
     renderResult("API Key 已写入", data);
@@ -516,7 +516,7 @@ async function ensureApiKeyConfigured() {
   try {
     await req("/api/system/api-key", "POST", {
       api_key: apiKey,
-      provider: "openai"
+      provider: "deepseek"
     });
   } catch (_) {
     // Keep startup quiet; chat page will surface real errors if LLM remains unavailable.

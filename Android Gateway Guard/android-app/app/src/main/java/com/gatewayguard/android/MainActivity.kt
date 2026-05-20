@@ -35,16 +35,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chaquo.python.Python
@@ -94,7 +97,14 @@ class MainActivity : ComponentActivity() {
             relayUrl = defaultRemoteUrl
         )
         setContent {
-            GatewayGuardCarApp(uiState)
+            val baseDensity = LocalDensity.current
+            val carScreenDensity = Density(
+                density = baseDensity.density.coerceAtLeast(1.55f),
+                fontScale = baseDensity.fontScale.coerceAtLeast(1.20f)
+            )
+            CompositionLocalProvider(LocalDensity provides carScreenDensity) {
+                GatewayGuardCarApp(uiState)
+            }
         }
         ioScope.launch { startBackendAndLoadUi() }
     }
@@ -380,14 +390,14 @@ class MainActivity : ComponentActivity() {
     private fun saveApiKey() {
         val apiKey = uiState.apiKey.trim()
         if (apiKey.isEmpty()) {
-            showMessage("写入 API Key", "请输入有效的 OpenAI API Key。")
+            showMessage("写入 API Key", "请输入有效的 DeepSeek API Key。")
             return
         }
         runAction("写入 API Key") {
             requestText(
                 "/api/system/api-key",
                 "POST",
-                JSONObject().put("api_key", apiKey).put("provider", "openai")
+                JSONObject().put("api_key", apiKey).put("provider", "deepseek")
             )
         }
     }
@@ -1085,7 +1095,7 @@ class MainActivity : ComponentActivity() {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("连接配置", color = palette.text, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                 LargeTextField(
-                    label = "OpenAI API Key",
+                    label = "DeepSeek API Key",
                     value = state.apiKey,
                     onValueChange = { value -> updateUi { it.copy(apiKey = value) } },
                     password = true

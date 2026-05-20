@@ -150,6 +150,8 @@ async def get_traffic_stats(db: AsyncSession = Depends(get_db)):
 @router.get("/packets")
 async def get_packets(
     protocol: Optional[str] = None,
+    start_time: Optional[float] = Query(None, description="Start timestamp in seconds"),
+    end_time: Optional[float] = Query(None, description="End timestamp in seconds"),
     limit: int = Query(50, le=500),
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
@@ -157,6 +159,10 @@ async def get_packets(
     stmt = select(PacketORM).order_by(PacketORM.timestamp.desc())
     if protocol:
         stmt = stmt.where(PacketORM.protocol == protocol.upper())
+    if start_time is not None:
+        stmt = stmt.where(PacketORM.timestamp >= start_time)
+    if end_time is not None:
+        stmt = stmt.where(PacketORM.timestamp <= end_time)
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
     rows = result.scalars().all()

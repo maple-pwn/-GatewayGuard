@@ -38,3 +38,8 @@ export const systemApi = {
   clearPackets: (params) => api.delete('/system/clear-packets', { params }),
   clearAnomalies: (params) => api.delete('/system/clear-anomalies', { params }),
 }
+
+export const mobileApi = {
+  getStatus: () => api.get('/mobile/status'),
+  getRelayStatus: () => api.get('/mobile/relay/status'),
+}

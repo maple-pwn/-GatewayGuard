@@ -1,3 +1,3 @@
 window.GATEWAY_GUARD_CONFIG = {
-  serverUrl: 'http://localhost:8000',
+  serverUrl: 'http://127.0.0.1:18000',
 }

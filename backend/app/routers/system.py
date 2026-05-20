@@ -1,17 +1,66 @@
 """系统相关API路由"""
 
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+import yaml
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import text, select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.config import CONFIG_PATH, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, settings
 from app.database import get_db
 from app.models.packet import PacketORM
 from app.models.anomaly import AnomalyEventORM
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+
+
+class LLMApiKeyRequest(BaseModel):
+    api_key: str
+    provider: str = "deepseek"
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+
+def _current_llm_model() -> str:
+    if settings.llm.provider == "ollama":
+        return settings.llm.ollama_model
+    return settings.llm.deepseek_model
+
+
+def _current_llm_has_api_key() -> bool:
+    if settings.llm.provider == "ollama":
+        return True
+    return bool(settings.llm.deepseek_api_key)
+
+
+def _persist_deepseek_config() -> None:
+    path = Path(CONFIG_PATH)
+    data = {}
+    if path.is_file():
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    llm_data = data.setdefault("llm", {})
+    llm_data.update(
+        {
+            "provider": "deepseek",
+            "deepseek_api_key": settings.llm.deepseek_api_key,
+            "deepseek_base_url": settings.llm.deepseek_base_url,
+            "deepseek_model": settings.llm.deepseek_model,
+        }
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _reload_llm_engine() -> None:
+    from app.routers import llm as llm_router
+
+    llm_router.llm._init_client()
 
 
 @router.get("/status")
@@ -20,15 +69,44 @@ async def get_system_status():
     return {
         "status": "running",
         "llm_provider": settings.llm.provider,
-        "llm_model": (
-            settings.llm.ollama_model
-            if settings.llm.provider == "ollama"
-            else settings.llm.openai_model
-        ),
+        "llm_model": _current_llm_model(),
+        "llm_has_api_key": _current_llm_has_api_key(),
         "detector": {
             "rule_enabled": settings.detector.rule_enabled,
             "ml_enabled": settings.detector.ml_enabled,
         },
+    }
+
+
+@router.post("/api-key")
+async def configure_deepseek_api_key(payload: LLMApiKeyRequest):
+    """Write the DeepSeek API key and refresh the in-process LLM client."""
+    provider = (payload.provider or "deepseek").strip().lower()
+    if provider in {"openai", "codex"}:
+        provider = "deepseek"
+    if provider != "deepseek":
+        raise HTTPException(status_code=400, detail="Only DeepSeek provider is supported")
+
+    api_key = payload.api_key.strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="DeepSeek API key is required")
+
+    settings.llm.provider = "deepseek"
+    settings.llm.deepseek_api_key = api_key
+    settings.llm.deepseek_base_url = (payload.base_url or DEEPSEEK_BASE_URL).rstrip("/")
+    settings.llm.deepseek_model = payload.model or DEEPSEEK_MODEL
+    settings.llm.openai_api_key = settings.llm.deepseek_api_key
+    settings.llm.openai_base_url = settings.llm.deepseek_base_url
+    settings.llm.openai_model = settings.llm.deepseek_model
+
+    _persist_deepseek_config()
+    _reload_llm_engine()
+    return {
+        "provider": settings.llm.provider,
+        "model": settings.llm.deepseek_model,
+        "base_url": settings.llm.deepseek_base_url,
+        "llm_has_api_key": True,
+        "message": "DeepSeek API key saved",
     }
 
 

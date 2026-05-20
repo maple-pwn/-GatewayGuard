@@ -1,4 +1,4 @@
-"""LLM service layer with optional OpenAI SDK and HTTP fallback."""
+"""LLM service layer with optional OpenAI-compatible SDK and HTTP fallback."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from app.config import settings
 from app.models.anomaly import AnomalyEvent
 from app.utils.prompt_templates import (
     ANOMALY_ANALYSIS_PROMPT,
+    CHAT_SYSTEM_PROMPT,
     REPORT_GENERATION_PROMPT,
     SYSTEM_PROMPT,
 )
@@ -39,9 +40,9 @@ class LLMEngine:
             self.api_key = "ollama"
             self.model = cfg.ollama_model
         else:
-            self.base_url = cfg.openai_base_url.rstrip("/")
-            self.api_key = cfg.openai_api_key
-            self.model = cfg.openai_model
+            self.base_url = cfg.deepseek_base_url.rstrip("/")
+            self.api_key = cfg.deepseek_api_key
+            self.model = cfg.deepseek_model
 
         try:
             from openai import AsyncOpenAI  # Optional for Android builds
@@ -115,10 +116,14 @@ class LLMEngine:
             return None
         result = []
         for tool_call in response.choices[0].message.tool_calls:
+            try:
+                arguments = json.loads(tool_call.function.arguments)
+            except (TypeError, json.JSONDecodeError):
+                arguments = {"raw": tool_call.function.arguments}
             result.append(
                 {
                     "name": tool_call.function.name,
-                    "arguments": json.loads(tool_call.function.arguments),
+                    "arguments": arguments,
                 }
             )
         return result
@@ -185,7 +190,7 @@ class LLMEngine:
             return {"report_raw": content}
 
     async def chat(self, messages: List[dict], use_tools: bool = True) -> dict:
-        full_messages = [{"role": "system", "content": SYSTEM_PROMPT}, *messages]
+        full_messages = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}, *messages]
         kwargs = {"tools": CHAT_TOOLS} if use_tools else {}
 
         response = await self._call_llm(full_messages, **kwargs)

@@ -1,6 +1,6 @@
 """LLM分析引擎
 
-支持OpenAI API和Ollama本地模型，提供：
+支持DeepSeek API和Ollama本地模型，提供：
 1. 异常事件语义分析
 2. 预警报告生成
 3. 交互式安全问答（Function Calling）
@@ -14,16 +14,17 @@ from openai import AsyncOpenAI
 
 from app.config import settings
 from app.utils.prompt_templates import (
-    SYSTEM_PROMPT,
     ANOMALY_ANALYSIS_PROMPT,
+    CHAT_SYSTEM_PROMPT,
     REPORT_GENERATION_PROMPT,
+    SYSTEM_PROMPT,
 )
 from app.utils.tools import CHAT_TOOLS
 from app.models.anomaly import AnomalyEvent
 
 
 class LLMEngine:
-    """LLM分析引擎，支持OpenAI/Ollama双模式"""
+    """LLM分析引擎，支持DeepSeek/Ollama双模式"""
 
     @staticmethod
     def _parse_json_response(content: str) -> dict:
@@ -47,10 +48,10 @@ class LLMEngine:
             self.model = cfg.ollama_model
         else:
             self.client = AsyncOpenAI(
-                base_url=cfg.openai_base_url,
-                api_key=cfg.openai_api_key,
+                base_url=cfg.deepseek_base_url,
+                api_key=cfg.deepseek_api_key,
             )
-            self.model = cfg.openai_model
+            self.model = cfg.deepseek_model
 
     async def _call_llm(self, messages: list, **kwargs) -> str:
         """统一的LLM调用入口"""
@@ -117,7 +118,7 @@ class LLMEngine:
     async def chat(self, messages: List[dict], use_tools: bool = True) -> dict:
         """交互式安全分析对话"""
         full_messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": CHAT_SYSTEM_PROMPT},
             *messages,
         ]
 
@@ -138,12 +139,18 @@ class LLMEngine:
         }
 
         if choice.message.tool_calls:
-            result["tool_calls"] = [
-                {
-                    "name": tc.function.name,
-                    "arguments": json.loads(tc.function.arguments),
-                }
-                for tc in choice.message.tool_calls
-            ]
+            tool_calls = []
+            for tc in choice.message.tool_calls:
+                try:
+                    arguments = json.loads(tc.function.arguments)
+                except (TypeError, json.JSONDecodeError):
+                    arguments = {"raw": tc.function.arguments}
+                tool_calls.append(
+                    {
+                        "name": tc.function.name,
+                        "arguments": arguments,
+                    }
+                )
+            result["tool_calls"] = tool_calls
 
         return result

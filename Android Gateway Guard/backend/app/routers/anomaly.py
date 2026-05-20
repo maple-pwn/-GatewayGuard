@@ -1,6 +1,7 @@
 """异常检测相关API路由"""
 
 import json
+import time
 from typing import Literal, Optional, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -97,6 +98,70 @@ def _training_status() -> dict:
     }
 
 
+def _summary_pair_rows(rows, order: Optional[list[str]] = None) -> list[dict]:
+    counts = {name or "unknown": int(count) for name, count in rows if count}
+    if not order:
+        return [{"name": name, "value": value} for name, value in counts.items()]
+
+    ordered = [{"name": name, "value": counts.pop(name)} for name in order if counts.get(name)]
+    ordered.extend({"name": name, "value": value} for name, value in counts.items())
+    return ordered
+
+
+def _minute_start(timestamp: float) -> int:
+    return int(timestamp // 60) * 60
+
+
+def _format_trend_bucket(timestamp: int) -> str:
+    return time.strftime("%H:%M", time.localtime(timestamp))
+
+
+def _risk_summary(
+    total: int,
+    weighted_score: float,
+    critical_count: int,
+    high_count: int,
+    medium_count: int,
+) -> dict:
+    if total <= 0:
+        return {"riskLabel": "CLEAR", "riskScore": 0, "riskHint": "No anomaly events"}
+
+    risk_score = round((weighted_score / (total * 4)) * 100)
+    if critical_count:
+        return {"riskLabel": "CRITICAL", "riskScore": risk_score, "riskHint": "Critical risk events exist"}
+    if high_count:
+        return {"riskLabel": "HIGH", "riskScore": risk_score, "riskHint": "High risk events exist"}
+    if medium_count:
+        return {"riskLabel": "MEDIUM", "riskScore": risk_score, "riskHint": "Medium risk events dominate"}
+    return {"riskLabel": "LOW", "riskScore": risk_score, "riskHint": "Current situation is relatively stable"}
+
+
+def _apply_event_filters(
+    stmt,
+    severity: Optional[str],
+    status: Optional[str],
+    record_type,
+    protocol: Optional[str] = None,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None,
+):
+    if severity:
+        stmt = stmt.where(AnomalyEventORM.severity == severity)
+    if status:
+        stmt = stmt.where(AnomalyEventORM.status == status)
+    if protocol:
+        stmt = stmt.where(AnomalyEventORM.protocol == protocol.upper())
+    if start_time is not None:
+        stmt = stmt.where(AnomalyEventORM.timestamp >= start_time)
+    if end_time is not None:
+        stmt = stmt.where(AnomalyEventORM.timestamp <= end_time)
+    if record_type == "aggregated_event":
+        stmt = stmt.where(AnomalyEventORM.detection_method == "event_aggregation")
+    elif record_type == "packet_alert":
+        stmt = stmt.where(_packet_alert_filter())
+    return stmt
+
+
 @router.get("/status")
 async def get_detector_status():
     """查询检测器训练状态"""
@@ -107,33 +172,34 @@ async def get_detector_status():
 async def get_anomaly_events(
     severity: str = Query(None),
     status: str = Query(None),
+    protocol: Optional[str] = Query(None, description="Protocol type: CAN/ETH/V2X"),
     record_type: Optional[Literal["packet_alert", "aggregated_event"]] = Query(None),
-    limit: int = Query(50, le=200),
+    start_time: Optional[float] = Query(None, description="Start timestamp in seconds"),
+    end_time: Optional[float] = Query(None, description="End timestamp in seconds"),
+    limit: int = Query(50, le=1000),
     offset: int = 0,
+    include_evidence: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
     """查询异常事件列表"""
-    stmt = select(AnomalyEventORM).order_by(AnomalyEventORM.timestamp.desc())
-    if severity:
-        stmt = stmt.where(AnomalyEventORM.severity == severity)
-    if status:
-        stmt = stmt.where(AnomalyEventORM.status == status)
-    if record_type == "aggregated_event":
-        stmt = stmt.where(AnomalyEventORM.detection_method == "event_aggregation")
-    elif record_type == "packet_alert":
-        stmt = stmt.where(_packet_alert_filter())
-
-    count_stmt = select(func.count()).select_from(AnomalyEventORM)
-    if severity:
-        count_stmt = count_stmt.where(AnomalyEventORM.severity == severity)
-    if status:
-        count_stmt = count_stmt.where(AnomalyEventORM.status == status)
-    if record_type == "aggregated_event":
-        count_stmt = count_stmt.where(
-            AnomalyEventORM.detection_method == "event_aggregation"
-        )
-    elif record_type == "packet_alert":
-        count_stmt = count_stmt.where(_packet_alert_filter())
+    stmt = _apply_event_filters(
+        select(AnomalyEventORM).order_by(AnomalyEventORM.timestamp.desc()),
+        severity,
+        status,
+        record_type,
+        protocol,
+        start_time,
+        end_time,
+    )
+    count_stmt = _apply_event_filters(
+        select(func.count()).select_from(AnomalyEventORM),
+        severity,
+        status,
+        record_type,
+        protocol,
+        start_time,
+        end_time,
+    )
     total = await db.scalar(count_stmt)
 
     stmt = stmt.offset(offset).limit(limit)
@@ -159,10 +225,159 @@ async def get_anomaly_events(
                 "event_id": r.event_id,
                 "packet_count": r.packet_count,
                 "vehicle_profile": r.vehicle_profile,
-                "evidence": _parse_json_text(cast(Optional[str], r.evidence), []),
+                **(
+                    {"evidence": _parse_json_text(cast(Optional[str], r.evidence), [])}
+                    if include_evidence
+                    else {}
+                ),
             }
             for r in rows
         ],
+    }
+
+
+@router.get("/summary")
+async def get_anomaly_summary(
+    severity: str = Query(None),
+    status: str = Query(None),
+    protocol: Optional[str] = Query(None, description="Protocol type: CAN/ETH/V2X"),
+    record_type: Optional[Literal["packet_alert", "aggregated_event"]] = Query(None),
+    start_time: Optional[float] = Query(None, description="Start timestamp in seconds"),
+    end_time: Optional[float] = Query(None, description="End timestamp in seconds"),
+    window_minutes: int = Query(60, ge=1, le=1440),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return lightweight event-center summary data for the latest web UI."""
+    total_stmt = _apply_event_filters(
+        select(func.count()).select_from(AnomalyEventORM),
+        severity,
+        status,
+        record_type,
+        protocol,
+        start_time,
+        end_time,
+    )
+    total = int(await db.scalar(total_stmt) or 0)
+
+    severity_rows = (
+        await db.execute(
+            _apply_event_filters(
+                select(AnomalyEventORM.severity, func.count()).group_by(AnomalyEventORM.severity),
+                severity,
+                status,
+                record_type,
+                protocol,
+                start_time,
+                end_time,
+            )
+        )
+    ).all()
+    protocol_rows = (
+        await db.execute(
+            _apply_event_filters(
+                select(AnomalyEventORM.protocol, func.count()).group_by(AnomalyEventORM.protocol),
+                severity,
+                status,
+                record_type,
+                protocol,
+                start_time,
+                end_time,
+            )
+        )
+    ).all()
+    status_rows = (
+        await db.execute(
+            _apply_event_filters(
+                select(AnomalyEventORM.status, func.count()).group_by(AnomalyEventORM.status),
+                severity,
+                status,
+                record_type,
+                protocol,
+                start_time,
+                end_time,
+            )
+        )
+    ).all()
+    type_rows = (
+        await db.execute(
+            _apply_event_filters(
+                select(AnomalyEventORM.anomaly_type, func.count())
+                .group_by(AnomalyEventORM.anomaly_type)
+                .order_by(func.count().desc())
+                .limit(5),
+                severity,
+                status,
+                record_type,
+                protocol,
+                start_time,
+                end_time,
+            )
+        )
+    ).all()
+
+    severity_counts = {name: int(count) for name, count in severity_rows}
+    status_counts = {name: int(count) for name, count in status_rows}
+    weighted_score = (
+        severity_counts.get("critical", 0) * 4
+        + severity_counts.get("high", 0) * 3
+        + severity_counts.get("medium", 0) * 2
+        + severity_counts.get("low", 0)
+    )
+
+    trend_end = end_time if end_time is not None else time.time()
+    end_minute = _minute_start(trend_end)
+    start_minute = (
+        _minute_start(start_time)
+        if start_time is not None
+        else end_minute - window_minutes * 60
+    )
+    if end_minute - start_minute > window_minutes * 60:
+        start_minute = end_minute - window_minutes * 60
+    buckets = {
+        minute: {
+            "timestamp": minute,
+            "name": _format_trend_bucket(minute),
+            "total": 0,
+            "highRisk": 0,
+        }
+        for minute in range(start_minute, end_minute + 1, 60)
+    }
+    trend_stmt = _apply_event_filters(
+        select(AnomalyEventORM.timestamp, AnomalyEventORM.severity).where(
+            AnomalyEventORM.timestamp >= start_minute
+        ),
+        severity,
+        status,
+        record_type,
+        protocol,
+        start_time,
+        end_time,
+    )
+    trend_rows = (await db.execute(trend_stmt)).all()
+    for timestamp, row_severity in trend_rows:
+        bucket = buckets.get(_minute_start(float(timestamp)))
+        if not bucket:
+            continue
+        bucket["total"] += 1
+        if row_severity in {"critical", "high"}:
+            bucket["highRisk"] += 1
+
+    return {
+        "total": total,
+        "high_risk_count": severity_counts.get("critical", 0) + severity_counts.get("high", 0),
+        "open_count": status_counts.get("open", 0) + status_counts.get("investigating", 0),
+        "severity": _summary_pair_rows(severity_rows, ["critical", "high", "medium", "low"]),
+        "protocol": _summary_pair_rows(protocol_rows, ["CAN", "ETH", "V2X"]),
+        "status": _summary_pair_rows(status_rows, ["open", "investigating", "resolved"]),
+        "typeTop": _summary_pair_rows(type_rows),
+        "trend": list(buckets.values()),
+        **_risk_summary(
+            total,
+            weighted_score,
+            severity_counts.get("critical", 0),
+            severity_counts.get("high", 0),
+            severity_counts.get("medium", 0),
+        ),
     }
 
 

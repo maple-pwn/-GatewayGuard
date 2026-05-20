@@ -12,10 +12,10 @@ app:
     - "http://localhost:5173"
 
 llm:
-  provider: "openai"          # "openai" or "ollama"
-  openai_api_key: "sk-your-key-here"
-  openai_base_url: "https://api.openai.com/v1"
-  openai_model: "gpt-4o-mini"
+  provider: "deepseek"        # "deepseek" or "ollama"
+  deepseek_api_key: "sk-your-deepseek-key-here"
+  deepseek_base_url: "https://api.deepseek.com"
+  deepseek_model: "deepseek-v4-flash"
   ollama_base_url: "http://localhost:11434"
   ollama_model: "qwen2.5:7b"
   max_tokens: 2048

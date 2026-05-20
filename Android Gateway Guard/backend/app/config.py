@@ -15,6 +15,8 @@ from app.platform import get_home_dir, is_android_env
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_TEMPLATE = PACKAGE_ROOT / "config.yaml.example"
 RUNTIME_SUBDIRS = ("profiles", "imports", "reports", "logs")
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 
 def _runtime_home() -> Path:
@@ -55,7 +57,11 @@ def _ensure_runtime_layout() -> Path:
 
 @dataclass
 class LLMConfig:
-    provider: str = "openai"
+    provider: str = "deepseek"
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = DEEPSEEK_BASE_URL
+    deepseek_model: str = DEEPSEEK_MODEL
+    # Legacy aliases kept so older config.yaml files and env setup still load.
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
@@ -182,6 +188,34 @@ def _apply_section(target, section: dict) -> None:
             setattr(target, key, value)
 
 
+def _normalize_llm_config(config: LLMConfig, source: dict | None = None) -> None:
+    source = source or {}
+    provider = str(config.provider or "deepseek").strip().lower()
+    if provider in {"openai", "codex"}:
+        provider = "deepseek"
+    config.provider = provider
+
+    if not source.get("deepseek_api_key") and source.get("openai_api_key"):
+        config.deepseek_api_key = source["openai_api_key"]
+    if (
+        not source.get("deepseek_base_url")
+        and isinstance(source.get("openai_base_url"), str)
+        and "deepseek" in source["openai_base_url"]
+    ):
+        config.deepseek_base_url = source["openai_base_url"].rstrip("/")
+    if (
+        not source.get("deepseek_model")
+        and isinstance(source.get("openai_model"), str)
+        and source["openai_model"].startswith("deepseek")
+    ):
+        config.deepseek_model = source["openai_model"]
+
+    if config.provider == "deepseek":
+        config.openai_api_key = config.deepseek_api_key
+        config.openai_base_url = config.deepseek_base_url
+        config.openai_model = config.deepseek_model
+
+
 def _resolve_sqlite_url(db_url: str, runtime_home: Path) -> str:
     prefixes = ("sqlite+aiosqlite:///", "sqlite:///")
     selected_prefix = "sqlite+aiosqlite:///"
@@ -236,6 +270,7 @@ def load_config() -> AppConfig:
 
     llm_data = data.get("llm", {})
     _apply_section(config.llm, llm_data)
+    _normalize_llm_config(config.llm, llm_data)
 
     detector_data = data.get("detector", {})
     _apply_section(config.detector, detector_data)
@@ -248,8 +283,15 @@ def load_config() -> AppConfig:
     remote_sync_data = data.get("remote_sync", {})
     _apply_section(config.remote_sync, remote_sync_data)
 
-    if env_key := os.getenv("OPENAI_API_KEY"):
-        config.llm.openai_api_key = env_key
+    if env_key := os.getenv("DEEPSEEK_API_KEY"):
+        config.llm.deepseek_api_key = env_key
+        config.llm.provider = "deepseek"
+    elif env_key := os.getenv("OPENAI_API_KEY"):
+        config.llm.deepseek_api_key = env_key
+    if env_base := os.getenv("DEEPSEEK_BASE_URL"):
+        config.llm.deepseek_base_url = env_base.rstrip("/")
+    if env_model := os.getenv("DEEPSEEK_MODEL"):
+        config.llm.deepseek_model = env_model
     if env_provider := os.getenv("LLM_PROVIDER"):
         config.llm.provider = env_provider
     if env_ollama := os.getenv("OLLAMA_URL"):
@@ -265,6 +307,7 @@ def load_config() -> AppConfig:
         config.remote_sync.device_name = env_device_name
 
     _finalize_paths(config, runtime_home)
+    _normalize_llm_config(config.llm)
     return config
 
 

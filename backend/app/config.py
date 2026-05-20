@@ -9,11 +9,17 @@ import yaml
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.yaml"
 CONFIG_DIR = CONFIG_PATH.parent
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 
 @dataclass
 class LLMConfig:
-    provider: str = "openai"
+    provider: str = "deepseek"
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = DEEPSEEK_BASE_URL
+    deepseek_model: str = DEEPSEEK_MODEL
+    # Legacy aliases kept so older config.yaml files and env setup still load.
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
@@ -131,6 +137,34 @@ def _apply_section(target, section: dict) -> None:
             setattr(target, key, value)
 
 
+def _normalize_llm_config(config: LLMConfig, source: dict | None = None) -> None:
+    source = source or {}
+    provider = str(config.provider or "deepseek").strip().lower()
+    if provider in {"openai", "codex"}:
+        provider = "deepseek"
+    config.provider = provider
+
+    if not source.get("deepseek_api_key") and source.get("openai_api_key"):
+        config.deepseek_api_key = source["openai_api_key"]
+    if (
+        not source.get("deepseek_base_url")
+        and isinstance(source.get("openai_base_url"), str)
+        and "deepseek" in source["openai_base_url"]
+    ):
+        config.deepseek_base_url = source["openai_base_url"].rstrip("/")
+    if (
+        not source.get("deepseek_model")
+        and isinstance(source.get("openai_model"), str)
+        and source["openai_model"].startswith("deepseek")
+    ):
+        config.deepseek_model = source["openai_model"]
+
+    if config.provider == "deepseek":
+        config.openai_api_key = config.deepseek_api_key
+        config.openai_base_url = config.deepseek_base_url
+        config.openai_model = config.deepseek_model
+
+
 def _resolve_sqlite_url(db_url: str) -> str:
     """将相对 SQLite URL 解析到 config.yaml 所在目录，避免启动目录影响数据库文件位置。"""
     prefixes = ("sqlite+aiosqlite:///", "sqlite:///")
@@ -157,6 +191,7 @@ def load_config() -> AppConfig:
 
     llm_data = data.get("llm", {})
     _apply_section(config.llm, llm_data)
+    _normalize_llm_config(config.llm, llm_data)
 
     detector_data = data.get("detector", {})
     _apply_section(config.detector, detector_data)
@@ -171,8 +206,15 @@ def load_config() -> AppConfig:
     _apply_section(config.relay, relay_data)
 
     # --- 环境变量层：优先级最高，覆盖 YAML ---
-    if env_key := os.getenv("OPENAI_API_KEY"):
-        config.llm.openai_api_key = env_key
+    if env_key := os.getenv("DEEPSEEK_API_KEY"):
+        config.llm.deepseek_api_key = env_key
+        config.llm.provider = "deepseek"
+    elif env_key := os.getenv("OPENAI_API_KEY"):
+        config.llm.deepseek_api_key = env_key
+    if env_base := os.getenv("DEEPSEEK_BASE_URL"):
+        config.llm.deepseek_base_url = env_base.rstrip("/")
+    if env_model := os.getenv("DEEPSEEK_MODEL"):
+        config.llm.deepseek_model = env_model
     if env_provider := os.getenv("LLM_PROVIDER"):
         config.llm.provider = env_provider
     if env_ollama := os.getenv("OLLAMA_URL"):
@@ -193,6 +235,7 @@ def load_config() -> AppConfig:
         }
 
     config.db_url = _resolve_sqlite_url(config.db_url)
+    _normalize_llm_config(config.llm)
 
     return config
 

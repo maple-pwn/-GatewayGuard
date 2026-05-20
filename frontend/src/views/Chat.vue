@@ -100,10 +100,12 @@ function loadStoredMessages() {
     if (!Array.isArray(parsed)) {
       return []
     }
-    return parsed.filter((item) => (
-      (item?.role === 'user' || item?.role === 'assistant') &&
-      typeof item?.content === 'string'
-    ))
+    return parsed
+      .filter((item) => (
+        (item?.role === 'user' || item?.role === 'assistant') &&
+        typeof item?.content === 'string'
+      ))
+      .map((item) => ({ ...item, content: plainTextResponse(item.content) }))
   } catch {
     return []
   }
@@ -160,6 +162,22 @@ function applyPrompt(text) {
   input.value = text
 }
 
+function plainTextResponse(value) {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/```[A-Za-z0-9_-]*\s*\n?([\s\S]*?)\n?```/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')
+    .replace(/(^|[^\*])\*([^\s][^*]*?[^\s])\*(?!\*)/g, '$1$2')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function updateClock() {
   const now = new Date()
   const hh = String(now.getHours()).padStart(2, '0')
@@ -196,7 +214,7 @@ async function sendMessage() {
     const res = await llmApi.chat(text, sessionId.value)
     messages.value.push({
       role: 'assistant',
-      content: res.data.response,
+      content: plainTextResponse(res.data.response),
     })
     saveStoredMessages()
   } catch {
