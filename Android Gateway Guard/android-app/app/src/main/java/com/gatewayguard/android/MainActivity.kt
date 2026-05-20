@@ -404,7 +404,13 @@ class MainActivity : ComponentActivity() {
 
     private fun simulateTraffic(panel: CarPanel = CarPanel.Console) {
         val scenario = uiState.scenario.trim().ifEmpty { "normal" }
-        val count = uiState.simulateCount.trim().ifEmpty { "120" }
+        val rawCount = uiState.simulateCount.trim()
+        val countValue = if (rawCount.isEmpty()) 120 else rawCount.toIntOrNull()
+        if (countValue == null || countValue !in 1..1000) {
+            showMessage("生成模拟流量", "生成数量必须在 1 到 1000 之间。", panel)
+            return
+        }
+        val count = countValue.toString()
         runAction("生成模拟流量", panel) {
             requestText(
                 "/api/traffic/simulate?scenario=${urlEncode(scenario)}&count=${urlEncode(count)}",

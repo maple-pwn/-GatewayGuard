@@ -43,8 +43,17 @@ class TestTrafficAPI:
         resp = await client.post("/api/traffic/simulate?scenario=normal&count=20")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["generated"] > 0
+        assert data["generated"] == 20
         assert data["scenario"] == "normal"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("scenario", ["normal", "dos", "fuzzy", "spoofing", "mixed"])
+    async def test_simulate_count_is_total_generated(self, client, scenario):
+        resp = await client.post(f"/api/traffic/simulate?scenario={scenario}&count=37")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["generated"] == 37
+        assert data["scenario"] == scenario
 
     @pytest.mark.asyncio
     async def test_get_packets(self, client):

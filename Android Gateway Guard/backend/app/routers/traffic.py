@@ -60,6 +60,29 @@ def _latest_timestamp(packets: list[UnifiedPacket], fallback: float) -> float:
     return max((packet.timestamp for packet in packets), default=fallback)
 
 
+def _split_count(total: int, *weights: int) -> list[int]:
+    if not weights:
+        return []
+
+    safe_total = max(total, 0)
+    safe_weights = [max(weight, 0) for weight in weights]
+    weight_sum = sum(safe_weights)
+    if safe_total == 0 or weight_sum == 0:
+        return [0 for _ in safe_weights]
+
+    raw_counts = [safe_total * weight / weight_sum for weight in safe_weights]
+    counts = [int(value) for value in raw_counts]
+    remainder = safe_total - sum(counts)
+    order = sorted(
+        range(len(counts)),
+        key=lambda idx: raw_counts[idx] - counts[idx],
+        reverse=True,
+    )
+    for idx in order[:remainder]:
+        counts[idx] += 1
+    return counts
+
+
 def _build_simulation_packets(
     scenario: str,
     count: int,
@@ -68,34 +91,44 @@ def _build_simulation_packets(
     packets: list[UnifiedPacket] = []
 
     if scenario == "normal":
-        packets.extend(generate_normal_can(count, base_time))
-        packets.extend(generate_normal_eth(count // 2, base_time))
-        packets.extend(generate_normal_v2x(count // 3, base_time))
+        can_count, eth_count, v2x_count = _split_count(count, 6, 3, 2)
+        packets.extend(generate_normal_can(can_count, base_time))
+        packets.extend(generate_normal_eth(eth_count, base_time))
+        packets.extend(generate_normal_v2x(v2x_count, base_time))
     elif scenario == "dos":
-        normal_packets = generate_normal_can(count // 2, base_time)
+        normal_count = count // 2
+        attack_count = count - normal_count
+        normal_packets = generate_normal_can(normal_count, base_time)
         attack_base = _latest_timestamp(normal_packets, base_time) + 0.05
         packets.extend(normal_packets)
-        packets.extend(generate_dos_attack(count, attack_base))
+        packets.extend(generate_dos_attack(attack_count, attack_base))
     elif scenario == "fuzzy":
-        normal_packets = generate_normal_can(count // 2, base_time)
+        normal_count = count // 2
+        attack_count = count - normal_count
+        normal_packets = generate_normal_can(normal_count, base_time)
         attack_base = _latest_timestamp(normal_packets, base_time) + 0.05
         packets.extend(normal_packets)
-        packets.extend(generate_fuzzy_attack(count, attack_base))
+        packets.extend(generate_fuzzy_attack(attack_count, attack_base))
     elif scenario == "spoofing":
-        normal_packets = generate_normal_can(count // 2, base_time)
+        normal_count = count // 2
+        attack_count = count - normal_count
+        normal_packets = generate_normal_can(normal_count, base_time)
         attack_base = _latest_timestamp(normal_packets, base_time) + 0.05
         packets.extend(normal_packets)
-        packets.extend(generate_spoofing_attack(count, attack_base))
+        packets.extend(generate_spoofing_attack(attack_count, attack_base))
     elif scenario == "mixed":
+        can_count, eth_count, v2x_count, dos_count, fuzzy_count, spoofing_count = (
+            _split_count(count, 6, 2, 2, 3, 3, 3)
+        )
         normal_packets: list[UnifiedPacket] = []
-        normal_packets.extend(generate_normal_can(count, base_time))
-        normal_packets.extend(generate_normal_eth(count // 3, base_time))
-        normal_packets.extend(generate_normal_v2x(count // 4, base_time))
+        normal_packets.extend(generate_normal_can(can_count, base_time))
+        normal_packets.extend(generate_normal_eth(eth_count, base_time))
+        normal_packets.extend(generate_normal_v2x(v2x_count, base_time))
         attack_base = _latest_timestamp(normal_packets, base_time) + 0.05
         packets.extend(normal_packets)
-        packets.extend(generate_dos_attack(count // 3, attack_base))
-        packets.extend(generate_fuzzy_attack(count // 3, attack_base))
-        packets.extend(generate_spoofing_attack(count // 3, attack_base))
+        packets.extend(generate_dos_attack(dos_count, attack_base))
+        packets.extend(generate_fuzzy_attack(fuzzy_count, attack_base))
+        packets.extend(generate_spoofing_attack(spoofing_count, attack_base))
     else:
         raise ValueError(f"Unsupported simulation scenario: {scenario}")
 
