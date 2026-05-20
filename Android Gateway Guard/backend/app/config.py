@@ -161,7 +161,12 @@ class AppConfig:
     host: str = "127.0.0.1"
     port: int = 8000
     debug: bool = False
-    cors_origins: list = field(default_factory=lambda: ["http://localhost:5173"])
+    cors_origins: list = field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    )
     runtime_home: str = ""
     config_path: str = ""
     db_path: str = ""

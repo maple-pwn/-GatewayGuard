@@ -115,7 +115,12 @@ class AppConfig:
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = True
-    cors_origins: list = field(default_factory=lambda: ["http://localhost:5173"])
+    cors_origins: list = field(
+        default_factory=lambda: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    )
     llm: LLMConfig = field(default_factory=LLMConfig)
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     sources: SourcesConfig = field(default_factory=SourcesConfig)
