@@ -33,7 +33,12 @@
             <div class="message-bubble__role">
               {{ msg.role === 'user' ? '分析员' : 'AI 助手' }}
             </div>
-            <div class="message-bubble__text">{{ msg.content }}</div>
+            <div
+              v-if="msg.role === 'assistant'"
+              class="message-bubble__text message-bubble__markdown"
+              v-html="renderMarkdown(msg.content)"
+            ></div>
+            <div v-else class="message-bubble__text">{{ msg.content }}</div>
           </div>
         </div>
 
@@ -68,7 +73,14 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Loading } from '@element-plus/icons-vue'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import { anomalyApi, llmApi, trafficApi } from '../api/index.js'
+
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+})
 
 const route = useRoute()
 const CHAT_SESSION_STORAGE_KEY = 'gatewayGuardChatSessionId'
@@ -105,7 +117,6 @@ function loadStoredMessages() {
         (item?.role === 'user' || item?.role === 'assistant') &&
         typeof item?.content === 'string'
       ))
-      .map((item) => ({ ...item, content: plainTextResponse(item.content) }))
   } catch {
     return []
   }
@@ -162,20 +173,9 @@ function applyPrompt(text) {
   input.value = text
 }
 
-function plainTextResponse(value) {
-  return String(value || '')
-    .replace(/\r\n/g, '\n')
-    .replace(/```[A-Za-z0-9_-]*\s*\n?([\s\S]*?)\n?```/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
-    .replace(/^\s{0,3}>\s?/gm, '')
-    .replace(/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, '')
-    .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/^\s*\d+[.)]\s+/gm, '')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(^|[^\*])\*([^\s][^*]*?[^\s])\*(?!\*)/g, '$1$2')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+function renderMarkdown(content) {
+  const html = marked.parse(String(content || ''))
+  return DOMPurify.sanitize(html)
 }
 
 function updateClock() {
@@ -214,7 +214,7 @@ async function sendMessage() {
     const res = await llmApi.chat(text, sessionId.value)
     messages.value.push({
       role: 'assistant',
-      content: plainTextResponse(res.data.response),
+      content: res.data.response,
     })
     saveStoredMessages()
   } catch {
@@ -367,6 +367,53 @@ onUnmounted(() => {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.75;
+}
+
+.message-bubble__markdown {
+  white-space: normal;
+}
+
+.message-bubble__markdown :deep(p) {
+  margin: 0 0 10px;
+}
+
+.message-bubble__markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.message-bubble__markdown :deep(ul),
+.message-bubble__markdown :deep(ol) {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+}
+
+.message-bubble__markdown :deep(li) {
+  margin: 4px 0;
+}
+
+.message-bubble__markdown :deep(strong) {
+  font-weight: 800;
+}
+
+.message-bubble__markdown :deep(code) {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.08);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.message-bubble__markdown :deep(pre) {
+  overflow: auto;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.message-bubble__markdown :deep(pre code) {
+  padding: 0;
+  background: transparent;
 }
 
 .chat-loading {

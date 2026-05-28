@@ -147,6 +147,7 @@ class LLMEngine:
                     arguments = {"raw": tc.function.arguments}
                 tool_calls.append(
                     {
+                        "id": tc.id,
                         "name": tc.function.name,
                         "arguments": arguments,
                     }

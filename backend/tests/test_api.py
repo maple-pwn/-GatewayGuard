@@ -335,3 +335,57 @@ class TestLLMAPI:
         assert resp.status_code == 503
         data = resp.json()
         assert data["detail"] == "LLM service unavailable"
+
+    @pytest.mark.asyncio
+    async def test_chat_executes_tool_calls_before_replying(self, client, monkeypatch):
+        from app.routers import llm as llm_router
+
+        await _insert_event_for_llm()
+        calls = []
+
+        async def _chat(messages, use_tools=True):
+            calls.append((messages, use_tools))
+            if len(calls) == 1:
+                return {
+                    "content": "",
+                    "tool_calls": [
+                        {
+                            "id": "call_events",
+                            "name": "get_anomaly_events",
+                            "arguments": {"severity": "low", "limit": 5},
+                        }
+                    ],
+                }
+            assert use_tools is False
+            assert any("真实数据" in m.get("content", "") for m in messages)
+            return {
+                "content": "当前有 low 级 CAN 异常事件，建议先检查 TEST_SRC。",
+                "tool_calls": None,
+            }
+
+        monkeypatch.setattr(llm_router.llm, "chat", _chat)
+        resp = await client.post("/api/llm/chat?message=当前有哪些异常？")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["response"]
+        assert "TEST_SRC" in data["response"]
+
+    @pytest.mark.asyncio
+    async def test_chat_returns_readable_text_instead_of_raw_json(self, client, monkeypatch):
+        from app.routers import llm as llm_router
+
+        async def _chat(messages, use_tools=True):
+            return {
+                "content": '{"summary":"当前风险偏高","recommendations":["先检查CAN总线负载","再核对异常ID来源"]}',
+                "tool_calls": None,
+            }
+
+        monkeypatch.setattr(llm_router.llm, "chat", _chat)
+        resp = await client.post("/api/llm/chat?message=帮我看一下当前风险")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert not data["response"].strip().startswith("{")
+        assert "当前风险偏高" in data["response"]
+        assert "先检查CAN总线负载" in data["response"]

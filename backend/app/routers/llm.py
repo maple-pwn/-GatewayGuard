@@ -16,7 +16,6 @@ from app.services.llm_tools import (
     default_live_context_tools,
     execute_chat_tools,
     format_tool_results_for_prompt,
-    plain_text_response,
     should_attach_live_context,
     summarize_tool_results,
 )
@@ -24,6 +23,60 @@ from app.services.llm_tools import (
 router = APIRouter(prefix="/api/llm", tags=["llm"])
 
 llm = LLMEngine()
+
+
+def _format_chat_content(content: str) -> str:
+    text = (content or "").strip()
+    if not text:
+        return text
+
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError):
+        return content
+
+    if not isinstance(data, (dict, list)):
+        return content
+
+    lines: list[str] = []
+
+    def append_value(label: str, value) -> None:
+        title = label.replace("_", " ")
+        if isinstance(value, list):
+            if not value:
+                return
+            lines.append(f"{title}：")
+            for item in value:
+                if isinstance(item, dict):
+                    detail = "，".join(f"{k}：{v}" for k, v in item.items())
+                    lines.append(f"- {detail}")
+                else:
+                    lines.append(f"- {item}")
+            return
+        if isinstance(value, dict):
+            lines.append(f"{title}：")
+            for sub_key, sub_value in value.items():
+                append_value(str(sub_key), sub_value)
+            return
+        lines.append(f"{title}：{value}")
+
+    if isinstance(data, dict):
+        summary = data.get("summary") or data.get("conclusion") or data.get("title")
+        if summary:
+            lines.append(str(summary))
+        for key, value in data.items():
+            if key in {"summary", "conclusion", "title"}:
+                continue
+            append_value(str(key), value)
+    else:
+        lines.append("我整理到以下重点：")
+        for item in data:
+            if isinstance(item, dict):
+                lines.append("- " + "，".join(f"{k}：{v}" for k, v in item.items()))
+            else:
+                lines.append(f"- {item}")
+
+    return "\n".join(lines) or content
 
 
 @router.post("/analyze")
@@ -179,7 +232,7 @@ async def chat_endpoint(
 
     # 保存对话
     tool_calls = resp.get("tool_calls")
-    content = plain_text_response(resp.get("content", ""))
+    content = _format_chat_content(resp.get("content", ""))
     tool_metadata = None
     if requested_tool_calls or tool_results:
         tool_metadata = json.dumps(
