@@ -634,22 +634,47 @@ onUnmounted(() => {
   --el-tag-text-color: #953349;
 }
 
-:global(.shell--immersive) .ws-state-chip--connected {
+:global(.shell--immersive.theme--dark) .ws-state-chip--connected {
   --el-tag-bg-color: rgba(31, 112, 98, 0.22);
   --el-tag-border-color: rgba(78, 185, 165, 0.36);
   --el-tag-text-color: #a4e6da;
 }
 
-:global(.shell--immersive) .ws-state-chip--connecting {
+:global(.shell--immersive.theme--dark) .ws-state-chip--connecting {
   --el-tag-bg-color: rgba(105, 78, 22, 0.26);
   --el-tag-border-color: rgba(213, 164, 61, 0.42);
   --el-tag-text-color: #f1d28b;
 }
 
-:global(.shell--immersive) .ws-state-chip--disconnected {
+:global(.shell--immersive.theme--dark) .ws-state-chip--disconnected {
   --el-tag-bg-color: rgba(78, 17, 32, 0.32);
   --el-tag-border-color: rgba(176, 55, 76, 0.46);
   --el-tag-text-color: #ebb0ba;
+}
+
+:global(.shell--immersive.theme--light) .console-card {
+  border-color: rgba(92, 125, 174, 0.2) !important;
+  background:
+    radial-gradient(220px 110px at 100% 0%, rgba(61, 103, 255, 0.06), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(239, 246, 255, 0.78)) !important;
+}
+
+:global(.shell--immersive.theme--light) .ws-state-chip--connected {
+  --el-tag-bg-color: rgba(41, 178, 145, 0.12);
+  --el-tag-border-color: rgba(24, 145, 116, 0.28);
+  --el-tag-text-color: #107765;
+}
+
+:global(.shell--immersive.theme--light) .ws-state-chip--connecting {
+  --el-tag-bg-color: rgba(255, 197, 92, 0.14);
+  --el-tag-border-color: rgba(204, 137, 24, 0.3);
+  --el-tag-text-color: #986113;
+}
+
+:global(.shell--immersive.theme--light) .ws-state-chip--disconnected {
+  --el-tag-bg-color: rgba(255, 118, 132, 0.12);
+  --el-tag-border-color: rgba(210, 62, 83, 0.28);
+  --el-tag-text-color: #b4233f;
 }
 
 .panel-header {
@@ -825,7 +850,7 @@ onUnmounted(() => {
   letter-spacing: 0.04em;
 }
 
-:global(.shell--immersive) .maintenance-item {
+:global(.shell--immersive.theme--dark) .maintenance-item {
   border-color: rgba(93, 215, 255, 0.18) !important;
   background:
     linear-gradient(180deg, rgba(16, 34, 57, 0.82), rgba(8, 18, 32, 0.78)),
@@ -835,7 +860,7 @@ onUnmounted(() => {
     0 18px 42px rgba(0, 0, 0, 0.2);
 }
 
-:global(.shell--immersive) .maintenance-item__desc {
+:global(.shell--immersive.theme--dark) .maintenance-item__desc {
   color: rgba(188, 214, 248, 0.78) !important;
 }
 
@@ -852,6 +877,10 @@ onUnmounted(() => {
     0 0 34px rgba(93, 215, 255, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(18px);
+}
+
+:global(.maintenance-dialog, .maintenance-dialog *) {
+  -webkit-text-fill-color: currentColor;
 }
 
 :global(.maintenance-dialog-modal) {
@@ -872,6 +901,93 @@ onUnmounted(() => {
 
 :global(.maintenance-dialog .el-dialog__footer) {
   padding: 8px 22px 20px;
+}
+
+:global(html.theme--light .maintenance-dialog) {
+  color: #162130 !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 245, 255, 0.94)) !important;
+  border-color: rgba(92, 125, 174, 0.26) !important;
+  box-shadow: 0 24px 62px rgba(31, 58, 104, 0.16) !important;
+}
+
+:global(html.theme--light .maintenance-dialog-modal) {
+  background: rgba(239, 246, 255, 0.42) !important;
+  backdrop-filter: blur(8px);
+}
+
+:global(html.theme--light .maintenance-dialog .el-dialog__body) {
+  color: #162130 !important;
+}
+
+:global(html.theme--light .maintenance-dialog .maintenance-dialog__head) {
+  border-bottom-color: rgba(92, 125, 174, 0.18);
+}
+
+:global(html.theme--light .maintenance-dialog .maintenance-dialog__head::after) {
+  background: linear-gradient(90deg, rgba(47, 104, 216, 0.62), transparent);
+  box-shadow: none;
+}
+
+:global(html.theme--light .maintenance-dialog .maintenance-dialog__title) {
+  color: #10233d !important;
+}
+
+:global(html.theme--light .maintenance-dialog .maintenance-dialog__close) {
+  color: #334b68 !important;
+  border-color: rgba(92, 125, 174, 0.26);
+  background: rgba(239, 246, 255, 0.88);
+}
+
+:global(html.theme--light .maintenance-dialog .el-form-item__label) {
+  color: #334b68 !important;
+}
+
+:global(html.theme--light .maintenance-dialog .el-radio) {
+  --el-radio-text-color: #334b68;
+  --el-radio-input-border-color: rgba(92, 125, 174, 0.42);
+  --el-radio-checked-text-color: #1647a8;
+}
+
+:global(html.theme--light .maintenance-dialog .el-radio__inner) {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(92, 125, 174, 0.38);
+}
+
+:global(html.theme--light .maintenance-dialog .el-input__wrapper),
+:global(html.theme--light .maintenance-dialog .el-select__wrapper),
+:global(html.theme--light .maintenance-dialog .el-input-number),
+:global(html.theme--light .maintenance-dialog .el-input-number .el-input__wrapper) {
+  color: #162130 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(92, 125, 174, 0.28) !important;
+  box-shadow: 0 0 0 1px rgba(92, 125, 174, 0.18) inset !important;
+}
+
+:global(html.theme--light .maintenance-dialog .el-input__inner),
+:global(html.theme--light .maintenance-dialog .el-select__placeholder),
+:global(html.theme--light .maintenance-dialog .el-input-number .el-input__inner),
+:global(html.theme--light .maintenance-dialog .dialog-tip) {
+  color: #334b68 !important;
+}
+
+:global(html.theme--light .maintenance-dialog .el-input-number__decrease),
+:global(html.theme--light .maintenance-dialog .el-input-number__increase) {
+  color: #334b68 !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 241, 255, 0.9)) !important;
+  border-color: rgba(92, 125, 174, 0.26) !important;
+  box-shadow: none !important;
+}
+
+:global(html.theme--light .maintenance-dialog .el-input-number__decrease:hover),
+:global(html.theme--light .maintenance-dialog .el-input-number__increase:hover) {
+  color: #1647a8 !important;
+  background: linear-gradient(180deg, #ffffff, rgba(218, 234, 255, 0.92)) !important;
+}
+
+:global(html.theme--light .maintenance-dialog .maintenance-dialog__cancel) {
+  color: #334b68 !important;
+  border-color: rgba(92, 125, 174, 0.28) !important;
+  background: rgba(239, 246, 255, 0.88) !important;
 }
 
 .maintenance-dialog__head {

@@ -378,9 +378,165 @@ a {
   border-radius: 20px;
 }
 
-.shell--immersive .panel-card,
-.shell--immersive .portal-card,
-.shell--immersive .metric-card {
+.shell--immersive.theme--dark {
+  --gg-bg: #02070d;
+  --gg-surface: rgba(14, 23, 36, 0.86);
+  --gg-surface-soft: rgba(255, 255, 255, 0.06);
+  --gg-line: rgba(255, 255, 255, 0.1);
+  --gg-line-strong: rgba(148, 199, 255, 0.24);
+  --gg-text: #dce8fb;
+  --gg-text-soft: #bccfee;
+  --gg-text-strong: #f5f8ff;
+  --gg-shadow: 0 22px 56px rgba(0, 0, 0, 0.22);
+}
+
+.shell--immersive.theme--dark :is(
+  .immersive-topbar,
+  .immersive-topbar *,
+  .immersive-nav,
+  .immersive-nav *,
+  .immersive-nav__btn,
+  .immersive-nav__btn *,
+  .theme-toggle,
+  .theme-toggle *,
+  .el-button,
+  .el-button span,
+  .el-select,
+  .el-select *,
+  .el-input,
+  .el-input *,
+  .el-textarea,
+  .el-textarea *,
+  .el-tag,
+  .el-tag *,
+  .console-card,
+  .console-card *,
+  .maintenance-item,
+  .maintenance-item *,
+  .summary-box,
+  .summary-box *,
+  .panel-header,
+  .panel-header *,
+  .section-head,
+  .section-head *,
+  .metric-card__label,
+  .metric-card__meta,
+  .console-page,
+  .console-page *,
+  .events-page,
+  .events-page *,
+  .message-bubble,
+  .message-bubble *
+) {
+  -webkit-text-fill-color: currentColor;
+}
+
+html.theme--dark :is(
+  .el-overlay,
+  .el-overlay *,
+  .el-popper,
+  .el-popper *,
+  .maintenance-dialog,
+  .maintenance-dialog *,
+  .ai-report-dialog,
+  .ai-report-dialog *
+) {
+  -webkit-text-fill-color: currentColor;
+}
+
+.shell--immersive.theme--light {
+  --gg-bg: #eef5ff;
+  --gg-surface: rgba(255, 255, 255, 0.92);
+  --gg-surface-soft: rgba(239, 246, 255, 0.86);
+  --gg-line: rgba(126, 148, 178, 0.24);
+  --gg-line-strong: rgba(64, 112, 204, 0.28);
+  --gg-text: #162130;
+  --gg-text-soft: #51647f;
+  --gg-text-strong: #0f1a28;
+  --gg-shadow: 0 22px 52px rgba(31, 58, 104, 0.12);
+}
+
+.shell--immersive.theme--light :is(
+  .immersive-topbar,
+  .immersive-topbar *,
+  .immersive-nav,
+  .immersive-nav *,
+  .immersive-nav__btn,
+  .immersive-nav__btn *,
+  .theme-toggle,
+  .theme-toggle *,
+  .el-button,
+  .el-button span,
+  .el-select,
+  .el-select *,
+  .el-input,
+  .el-input *,
+  .el-textarea,
+  .el-textarea *,
+  .el-tag,
+  .el-tag *,
+  .table-card,
+  .table-card *,
+  .console-card,
+  .console-card *,
+  .maintenance-item,
+  .maintenance-item *,
+  .summary-box,
+  .summary-box *,
+  .panel-header,
+  .panel-header *,
+  .section-head,
+  .section-head *,
+  .metric-card__label,
+  .metric-card__meta,
+  .console-page,
+  .console-page *,
+  .events-page,
+  .events-page *,
+  .message-bubble,
+  .message-bubble *
+) {
+  -webkit-text-fill-color: currentColor;
+}
+
+html.theme--light :is(
+  .el-overlay,
+  .el-overlay *,
+  .el-popper,
+  .el-popper *,
+  .maintenance-dialog,
+  .maintenance-dialog *,
+  .ai-report-dialog,
+  .ai-report-dialog *
+) {
+  -webkit-text-fill-color: currentColor;
+}
+
+html.theme--light .el-dialog,
+html.theme--light .el-popover,
+html.theme--light .el-dropdown__popper,
+html.theme--light .el-select__popper,
+html.theme--light .maintenance-dialog,
+html.theme--light .ai-report-dialog {
+  color: #162130 !important;
+  background:
+    radial-gradient(360px 180px at 100% 0%, rgba(61, 103, 255, 0.1), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 245, 255, 0.92)) !important;
+  border-color: rgba(101, 128, 166, 0.24) !important;
+  box-shadow: 0 24px 62px rgba(31, 58, 104, 0.18) !important;
+}
+
+html.theme--light .el-dialog__title,
+html.theme--light .el-dialog__body,
+html.theme--light .el-popover,
+html.theme--light .el-dropdown-menu__item,
+html.theme--light .el-select-dropdown__item {
+  color: #162130 !important;
+}
+
+.shell--immersive.theme--dark .panel-card,
+.shell--immersive.theme--dark .portal-card,
+.shell--immersive.theme--dark .metric-card {
   border-color: rgba(255, 255, 255, 0.1) !important;
   background:
     radial-gradient(320px 160px at 100% 0%, rgba(87, 126, 255, 0.12), transparent 70%),
@@ -389,123 +545,127 @@ a {
   backdrop-filter: blur(12px);
 }
 
-.shell--immersive .metric-card__label,
-.shell--immersive .metric-card__meta,
-.shell--immersive .section-head__desc,
-.shell--immersive .mapping-item span,
-.shell--immersive .status-item span,
-.shell--immersive .console-hint {
+.shell--immersive.theme--dark .metric-card__label,
+.shell--immersive.theme--dark .metric-card__meta,
+.shell--immersive.theme--dark .section-head__desc,
+.shell--immersive.theme--dark .mapping-item span,
+.shell--immersive.theme--dark .status-item span,
+.shell--immersive.theme--dark .console-hint {
   color: rgba(188, 214, 248, 0.78) !important;
 }
 
-.shell--immersive .metric-card__value,
-.shell--immersive .metric-card__accent,
-.shell--immersive .section-head__title,
-.shell--immersive .about-head__title,
-.shell--immersive .mapping-item strong,
-.shell--immersive .status-item strong,
-.shell--immersive .panel-header__title,
-.shell--immersive .console-card__title {
+.shell--immersive.theme--dark .metric-card__value,
+.shell--immersive.theme--dark .metric-card__accent,
+.shell--immersive.theme--dark .section-head__title,
+.shell--immersive.theme--dark .about-head__title,
+.shell--immersive.theme--dark .mapping-item strong,
+.shell--immersive.theme--dark .status-item strong,
+.shell--immersive.theme--dark .panel-header__title,
+.shell--immersive.theme--dark .console-card__title {
   color: #f5f8ff !important;
 }
 
-.shell--immersive .brand-title,
-.shell--immersive .workspace-head h1,
-.shell--immersive .immersive-head__meta h1,
-.shell--immersive .about-head__title,
-.shell--immersive .section-head__title,
-.shell--immersive .panel-header__title,
-.shell--immersive .console-card__title {
+.shell--immersive.theme--dark .brand-title,
+.shell--immersive.theme--dark .workspace-head h1,
+.shell--immersive.theme--dark .immersive-head__meta h1,
+.shell--immersive.theme--dark .about-head__title,
+.shell--immersive.theme--dark .section-head__title,
+.shell--immersive.theme--dark .panel-header__title,
+.shell--immersive.theme--dark .console-card__title {
   color: #f8fbff !important;
   text-shadow: 0 0 18px rgba(115, 151, 255, 0.12);
 }
 
-.shell--immersive .brand-subtitle,
-.shell--immersive .workspace-eyebrow,
-.shell--immersive .metric-card__label,
-.shell--immersive .message-bubble__role,
-.shell--immersive .sidebar-foot__label {
+.shell--immersive.theme--dark .brand-subtitle,
+.shell--immersive.theme--dark .workspace-eyebrow,
+.shell--immersive.theme--dark .metric-card__label,
+.shell--immersive.theme--dark .message-bubble__role,
+.shell--immersive.theme--dark .sidebar-foot__label {
   color: #8ec5ff !important;
 }
 
-.shell--immersive .console-card__title {
+.shell--immersive.theme--dark .console-card__title {
   color: #7dd3fc !important;
   text-shadow: 0 0 14px rgba(93, 215, 255, 0.18) !important;
 }
 
-.shell--immersive .maintenance-item__title {
+.shell--immersive.theme--dark .maintenance-item__title {
   color: #8fdcff !important;
   text-shadow: 0 0 14px rgba(93, 215, 255, 0.16) !important;
 }
 
-.shell--immersive .status-v,
-.shell--immersive .summary-box strong {
+.shell--immersive.theme--dark .status-v,
+.shell--immersive.theme--dark .summary-box strong {
   color: #b8dcf2 !important;
   text-shadow: 0 0 10px rgba(93, 215, 255, 0.1) !important;
 }
 
-.shell--immersive .metric-card__value,
-.shell--immersive .status-item strong,
-.shell--immersive .pulse-core strong {
+.shell--immersive.theme--dark .metric-card__value,
+.shell--immersive.theme--dark .status-item strong,
+.shell--immersive.theme--dark .pulse-core strong {
   color: #f7fbff !important;
   text-shadow: 0 0 22px rgba(110, 156, 255, 0.14);
 }
 
-.shell--immersive .assistant-hero .metric-card__value,
-.shell--immersive .chat-layout .metric-card__value,
-.shell--immersive .events-page .metric-card__value,
-.shell--immersive .console-page .metric-card__value {
+.shell--immersive.theme--dark .assistant-hero .metric-card__value,
+.shell--immersive.theme--dark .chat-layout .metric-card__value,
+.shell--immersive.theme--dark .events-page .metric-card__value,
+.shell--immersive.theme--dark .console-page .metric-card__value {
   background: linear-gradient(180deg, #fefefe 0%, #b9d7ff 52%, #81f0de 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.shell--immersive .section-head__desc,
-.shell--immersive .panel-header__desc,
-.shell--immersive .metric-card__meta,
-.shell--immersive .brand-subtitle,
-.shell--immersive .workspace-head p,
-.shell--immersive .immersive-head__meta p,
-.shell--immersive .composer-actions,
-.shell--immersive .chat-empty__desc {
+.shell--immersive.theme--dark .metric-card__value > * {
+  -webkit-text-fill-color: currentColor;
+}
+
+.shell--immersive.theme--dark .section-head__desc,
+.shell--immersive.theme--dark .panel-header__desc,
+.shell--immersive.theme--dark .metric-card__meta,
+.shell--immersive.theme--dark .brand-subtitle,
+.shell--immersive.theme--dark .workspace-head p,
+.shell--immersive.theme--dark .immersive-head__meta p,
+.shell--immersive.theme--dark .composer-actions,
+.shell--immersive.theme--dark .chat-empty__desc {
   color: rgba(201, 217, 241, 0.76) !important;
 }
 
-.shell--immersive .status-k,
-.shell--immersive .info-label,
-.shell--immersive .filter-field label,
-.shell--immersive .ai-box__eyebrow,
-.shell--immersive .about-slide__eyebrow {
+.shell--immersive.theme--dark .status-k,
+.shell--immersive.theme--dark .info-label,
+.shell--immersive.theme--dark .filter-field label,
+.shell--immersive.theme--dark .ai-box__eyebrow,
+.shell--immersive.theme--dark .about-slide__eyebrow {
   color: #78d9d2 !important;
 }
 
-.shell--immersive .chat-empty__title,
-.shell--immersive .message-bubble__text,
-.shell--immersive .report-head h3,
-.shell--immersive .info-value,
-.shell--immersive .section-title {
+.shell--immersive.theme--dark .chat-empty__title,
+.shell--immersive.theme--dark .message-bubble__text,
+.shell--immersive.theme--dark .report-head h3,
+.shell--immersive.theme--dark .info-value,
+.shell--immersive.theme--dark .section-title {
   color: #edf4ff !important;
 }
 
-.shell--immersive .table-card .el-table th.el-table__cell {
+.shell--immersive.theme--dark .table-card .el-table th.el-table__cell {
   color: #94c7ff !important;
 }
 
-.shell--immersive .table-card .el-table td.el-table__cell,
-.shell--immersive .el-descriptions__body .el-descriptions__cell,
-.shell--immersive .el-timeline-item__content,
-.shell--immersive .el-timeline-item__timestamp {
+.shell--immersive.theme--dark .table-card .el-table td.el-table__cell,
+.shell--immersive.theme--dark .el-descriptions__body .el-descriptions__cell,
+.shell--immersive.theme--dark .el-timeline-item__content,
+.shell--immersive.theme--dark .el-timeline-item__timestamp {
   color: #dce8fb !important;
 }
 
-.shell--immersive .panel-card--dark {
+.shell--immersive.theme--dark .panel-card--dark {
   background:
     radial-gradient(360px 180px at 90% 0%, rgba(95, 138, 255, 0.18), transparent 72%),
     linear-gradient(180deg, rgba(18, 30, 48, 0.92), rgba(10, 18, 28, 0.84)) !important;
 }
 
-.shell--immersive .table-card .el-table {
+.shell--immersive.theme--dark .table-card .el-table {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-header-bg-color: rgba(255, 255, 255, 0.06);
@@ -515,11 +675,11 @@ a {
   --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.05);
 }
 
-.shell--immersive .table-card .el-table td.el-table__cell {
+.shell--immersive.theme--dark .table-card .el-table td.el-table__cell {
   background-color: transparent !important;
 }
 
-.shell--immersive .table-card .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+.shell--immersive.theme--dark .table-card .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
   background-color: rgba(255, 255, 255, 0.03) !important;
 }
 
@@ -551,51 +711,338 @@ a {
   border-color: rgba(78, 112, 190, 0.34);
 }
 
-.shell--immersive .traffic-export-btn.el-button {
+.shell--immersive.theme--dark .traffic-export-btn.el-button {
   color: #c8d8ef;
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.shell--immersive .traffic-export-btn.el-button:hover,
-.shell--immersive .traffic-export-btn.el-button:focus {
+.shell--immersive.theme--dark .traffic-export-btn.el-button:hover,
+.shell--immersive.theme--dark .traffic-export-btn.el-button:focus {
   color: #edf4ff;
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(148, 199, 255, 0.28);
 }
 
-.shell--immersive .el-button--default,
-.shell--immersive .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger) {
+.shell--immersive.theme--dark .el-button--default,
+.shell--immersive.theme--dark .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger) {
   color: #edf3ff;
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-.shell--immersive .el-input__wrapper,
-.shell--immersive .el-select__wrapper,
-.shell--immersive .el-textarea__inner,
-.shell--immersive .el-input-number,
-.shell--immersive .el-input-number .el-input__wrapper {
+.shell--immersive.theme--dark .el-input__wrapper,
+.shell--immersive.theme--dark .el-select__wrapper,
+.shell--immersive.theme--dark .el-textarea__inner,
+.shell--immersive.theme--dark .el-input-number,
+.shell--immersive.theme--dark .el-input-number .el-input__wrapper {
   color: #edf3ff !important;
   background: rgba(255, 255, 255, 0.06) !important;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset !important;
 }
 
-.shell--immersive .chat-intro__prompts button,
-.shell--immersive .chat-intro__stat,
-.shell--immersive .status-item,
-.shell--immersive .mapping-item,
-.shell--immersive .console-card,
-.shell--immersive .summary-box,
-.shell--immersive .maintenance-item,
-.shell--immersive .alert-item,
-.shell--immersive .info-card,
-.shell--immersive .report-text-block,
-.shell--immersive .rec-item,
-.shell--immersive .filter-field,
-.shell--immersive .filter-action {
+.shell--immersive.theme--dark .chat-intro__prompts button,
+.shell--immersive.theme--dark .chat-intro__stat,
+.shell--immersive.theme--dark .status-item,
+.shell--immersive.theme--dark .mapping-item,
+.shell--immersive.theme--dark .console-card,
+.shell--immersive.theme--dark .summary-box,
+.shell--immersive.theme--dark .maintenance-item,
+.shell--immersive.theme--dark .alert-item,
+.shell--immersive.theme--dark .info-card,
+.shell--immersive.theme--dark .report-text-block,
+.shell--immersive.theme--dark .rec-item,
+.shell--immersive.theme--dark .filter-field,
+.shell--immersive.theme--dark .filter-action {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.shell--immersive.theme--light .panel-card,
+.shell--immersive.theme--light .portal-card,
+.shell--immersive.theme--light .metric-card {
+  border-color: rgba(122, 141, 166, 0.22) !important;
+  background:
+    radial-gradient(320px 160px at 100% 0%, rgba(61, 103, 255, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 255, 0.84)) !important;
+  box-shadow: 0 20px 48px rgba(18, 32, 56, 0.1) !important;
+  backdrop-filter: blur(12px);
+}
+
+.shell--immersive.theme--light .panel-card--dark {
+  color: var(--gg-text);
+  background:
+    radial-gradient(360px 180px at 90% 0%, rgba(61, 103, 255, 0.1), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 249, 255, 0.88)) !important;
+  border-color: rgba(122, 141, 166, 0.24) !important;
+}
+
+.shell--immersive.theme--light .metric-card__label,
+.shell--immersive.theme--light .metric-card__meta,
+.shell--immersive.theme--light .section-head__desc,
+.shell--immersive.theme--light .panel-header__desc,
+.shell--immersive.theme--light .maintenance-item__desc,
+.shell--immersive.theme--light .immersive-head__meta p,
+.shell--immersive.theme--light .mapping-item span,
+.shell--immersive.theme--light .status-item span,
+.shell--immersive.theme--light .console-hint,
+.shell--immersive.theme--light .composer-actions,
+.shell--immersive.theme--light .chat-empty__desc {
+  color: var(--gg-text-soft) !important;
+}
+
+.shell--immersive.theme--light .metric-card__value,
+.shell--immersive.theme--light .metric-card__accent,
+.shell--immersive.theme--light .section-head__title,
+.shell--immersive.theme--light .about-head__title,
+.shell--immersive.theme--light .maintenance-item__title,
+.shell--immersive.theme--light .immersive-head__meta h1,
+.shell--immersive.theme--light .mapping-item strong,
+.shell--immersive.theme--light .status-item strong,
+.shell--immersive.theme--light .panel-header__title,
+.shell--immersive.theme--light .console-card__title,
+.shell--immersive.theme--light .chat-empty__title,
+.shell--immersive.theme--light .message-bubble__text,
+.shell--immersive.theme--light .report-head h3,
+.shell--immersive.theme--light .info-value,
+.shell--immersive.theme--light .section-title,
+.shell--immersive.theme--light .table-card .el-table td.el-table__cell,
+.shell--immersive.theme--light .el-descriptions__body .el-descriptions__cell,
+.shell--immersive.theme--light .el-timeline-item__content,
+.shell--immersive.theme--light .el-timeline-item__timestamp {
+  color: var(--gg-text-strong) !important;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light :is(
+  .maintenance-item__title,
+  .immersive-head__meta h1,
+  .panel-card--dark :is(h1, h2, h3, strong)
+) {
+  color: var(--gg-text-strong) !important;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light :is(
+  .maintenance-item__desc,
+  .immersive-head__meta p
+) {
+  color: var(--gg-text-soft) !important;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light .brand-title,
+.shell--immersive.theme--light .workspace-head h1,
+.shell--immersive.theme--light .immersive-head__meta h1 {
+  color: var(--gg-text-strong) !important;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light .brand-subtitle,
+.shell--immersive.theme--light .workspace-eyebrow,
+.shell--immersive.theme--light .message-bubble__role,
+.shell--immersive.theme--light .status-k,
+.shell--immersive.theme--light .info-label,
+.shell--immersive.theme--light .filter-field label,
+.shell--immersive.theme--light .ai-box__eyebrow,
+.shell--immersive.theme--light .about-slide__eyebrow {
+  color: #2f58b8 !important;
+}
+
+.shell--immersive.theme--light .assistant-hero .metric-card__value,
+.shell--immersive.theme--light .chat-layout .metric-card__value,
+.shell--immersive.theme--light .events-page .metric-card__value,
+.shell--immersive.theme--light .console-page .metric-card__value,
+.shell--immersive.theme--light .about-page--immersive .metric-card__value {
+  background: linear-gradient(180deg, #0f3c74 0%, #2774e8 52%, #10a38c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shell--immersive.theme--light .about-page--immersive :is(
+  button,
+  button *,
+  a,
+  a *,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  strong,
+  small,
+  label,
+  li,
+  td,
+  th
+) {
+  color: #10233d !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light .about-page--immersive .carousel-arrow,
+.shell--immersive.theme--light .about-page--immersive .carousel-arrow * {
+  color: #10233d !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light .about-page--immersive .carousel-dot {
+  background: rgba(92, 125, 174, 0.34) !important;
+}
+
+.shell--immersive.theme--light .about-page--immersive .carousel-dot.active {
+  background: #2f68d8 !important;
+}
+
+.shell--immersive.theme--light .table-card .el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(230, 240, 255, 0.94);
+  --el-table-border-color: rgba(122, 141, 166, 0.2);
+  --el-table-text-color: var(--gg-text);
+  --el-table-header-text-color: #1f4c86;
+  --el-table-row-hover-bg-color: rgba(224, 238, 255, 0.82);
+}
+
+.shell--immersive.theme--light .table-card .el-table th.el-table__cell {
+  color: #1f4c86 !important;
+  background-color: rgba(230, 240, 255, 0.94) !important;
+}
+
+.shell--immersive.theme--light .table-card .el-table td.el-table__cell {
+  color: #162130 !important;
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.shell--immersive.theme--light .table-card .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background-color: rgba(239, 246, 255, 0.7) !important;
+}
+
+.shell--immersive.theme--light .el-button--default,
+.shell--immersive.theme--light .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger) {
+  color: var(--gg-text-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(230, 240, 255, 0.84));
+  border-color: rgba(66, 106, 188, 0.28);
+  box-shadow: 0 10px 24px rgba(35, 77, 150, 0.1);
+}
+
+.shell--immersive.theme--light .el-button--default:hover,
+.shell--immersive.theme--light .el-button--default:focus,
+.shell--immersive.theme--light .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):hover,
+.shell--immersive.theme--light .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):focus {
+  color: #1647a8;
+  background: linear-gradient(180deg, #ffffff, rgba(218, 234, 255, 0.92));
+  border-color: rgba(61, 103, 255, 0.42);
+}
+
+.shell--immersive.theme--light .el-input__wrapper,
+.shell--immersive.theme--light .el-select__wrapper,
+.shell--immersive.theme--light .el-textarea__inner,
+.shell--immersive.theme--light .el-input-number,
+.shell--immersive.theme--light .el-input-number .el-input__wrapper {
+  color: var(--gg-text) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 0 0 1px rgba(92, 125, 174, 0.28) inset !important;
+}
+
+.shell--immersive.theme--light .el-input__inner,
+.shell--immersive.theme--light .el-select__placeholder,
+.shell--immersive.theme--light .el-textarea__inner {
+  color: #162130 !important;
+}
+
+.shell--immersive.theme--light .el-input__inner::placeholder,
+.shell--immersive.theme--light .el-textarea__inner::placeholder {
+  color: rgba(81, 100, 127, 0.68) !important;
+}
+
+.shell--immersive.theme--light .chat-intro__prompts button,
+.shell--immersive.theme--light .chat-intro__stat,
+.shell--immersive.theme--light .status-item,
+.shell--immersive.theme--light .mapping-item,
+.shell--immersive.theme--light .console-card,
+.shell--immersive.theme--light .summary-box,
+.shell--immersive.theme--light .maintenance-item,
+.shell--immersive.theme--light .alert-item,
+.shell--immersive.theme--light .info-card,
+.shell--immersive.theme--light .report-text-block,
+.shell--immersive.theme--light .rec-item,
+.shell--immersive.theme--light .filter-field,
+.shell--immersive.theme--light .filter-action,
+.shell--immersive.theme--light .message-bubble,
+.shell--immersive.theme--light .chat-empty,
+.shell--immersive.theme--light .report-risk-badge,
+.shell--immersive.theme--light .report-panel,
+.shell--immersive.theme--light .report-timeline__item,
+.shell--immersive.theme--light .report-conclusion {
+  color: var(--gg-text);
+  background:
+    radial-gradient(240px 120px at 100% 0%, rgba(61, 103, 255, 0.08), transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(236, 245, 255, 0.76)) !important;
+  border-color: rgba(101, 128, 166, 0.24) !important;
+}
+
+.shell--immersive.theme--light .composer {
+  background: rgba(248, 251, 255, 0.84) !important;
+  border-top-color: rgba(122, 141, 166, 0.2) !important;
+}
+
+.shell--immersive.theme--light .composer .el-textarea__inner {
+  color: var(--gg-text) !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  border-color: rgba(122, 141, 166, 0.24) !important;
+  box-shadow: none !important;
+}
+
+.shell--immersive.theme--light .composer .el-textarea__inner::placeholder {
+  color: rgba(102, 119, 140, 0.68) !important;
+}
+
+.shell--immersive.theme--light .message-row--user .message-bubble {
+  color: #ffffff;
+  background: linear-gradient(180deg, #4a74ff, #2e58e6) !important;
+}
+
+.shell--immersive.theme--light .message-row--user :is(.message-bubble__role, .message-bubble__text) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+.shell--immersive.theme--light .ai-box__actions .ai-action-btn,
+.shell--immersive.theme--light .filter-action .ai-action-btn--query,
+.shell--immersive.theme--light .console-action-btn {
+  color: var(--gg-text-strong) !important;
+  border-color: rgba(61, 103, 255, 0.22) !important;
+  background: rgba(238, 244, 255, 0.78) !important;
+  box-shadow: none;
+}
+
+.shell--immersive.theme--light .events-page .ai-action-btn--clear.el-button {
+  --el-button-bg-color: rgba(255, 247, 250, 0.96);
+  --el-button-border-color: rgba(210, 62, 83, 0.26);
+  --el-button-text-color: #b4233f;
+  color: #b4233f !important;
+  border-color: rgba(210, 62, 83, 0.26) !important;
+  background: linear-gradient(180deg, rgba(255, 247, 250, 0.96), rgba(255, 232, 238, 0.88)) !important;
+  box-shadow: 0 10px 22px rgba(194, 37, 67, 0.08) !important;
+}
+
+.shell--immersive.theme--light .events-page .ai-action-btn--clear.el-button:hover,
+.shell--immersive.theme--light .events-page .ai-action-btn--clear.el-button:focus {
+  --el-button-bg-color: rgba(255, 239, 244, 0.98);
+  --el-button-border-color: rgba(210, 62, 83, 0.38);
+  --el-button-text-color: #9f1d36;
+  color: #9f1d36 !important;
+  background: linear-gradient(180deg, rgba(255, 252, 253, 0.98), rgba(255, 221, 230, 0.92)) !important;
 }
 
 .gg-critical-notification {
@@ -668,137 +1115,173 @@ a {
   border-color: rgba(194, 69, 92, 0.42) !important;
 }
 
-.shell--immersive .message-bubble,
-.shell--immersive .chat-empty {
+html.theme--light .gg-console-notification,
+html.theme--light .el-message {
+  border-color: rgba(92, 125, 174, 0.24) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 245, 255, 0.94)) !important;
+  box-shadow: 0 18px 46px rgba(31, 58, 104, 0.14) !important;
+  backdrop-filter: blur(14px);
+}
+
+html.theme--light .gg-console-notification .el-notification__title,
+html.theme--light .el-message .el-message__content {
+  color: #162130 !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+html.theme--light .gg-console-notification .el-notification__content {
+  color: #334b68 !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+html.theme--light .gg-console-notification .el-notification__icon,
+html.theme--light .gg-console-notification .el-notification__closeBtn,
+html.theme--light .el-message .el-message__icon {
+  color: #2f68d8 !important;
+}
+
+html.theme--light .el-message.el-message--success {
+  border-color: rgba(41, 178, 145, 0.28) !important;
+}
+
+html.theme--light .el-message.el-message--success .el-message__icon {
+  color: #159a62 !important;
+}
+
+.shell--immersive.theme--dark .message-bubble,
+.shell--immersive.theme--dark .chat-empty {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
   color: #edf3ff;
 }
 
-.shell--immersive .composer {
+.shell--immersive.theme--dark .composer {
   background: rgba(8, 15, 24, 0.72) !important;
   border-top-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-.shell--immersive .composer-actions {
+.shell--immersive.theme--dark .composer-actions {
   color: rgba(214, 225, 245, 0.72) !important;
 }
 
-.shell--immersive .composer .el-textarea__inner {
+.shell--immersive.theme--dark .composer .el-textarea__inner {
   color: #edf3ff !important;
+  -webkit-text-fill-color: currentColor;
   background: rgba(255, 255, 255, 0.04) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
 }
 
-.shell--immersive .composer .el-textarea__inner::placeholder {
+.shell--immersive.theme--dark .composer .el-textarea__inner::placeholder {
   color: rgba(192, 207, 232, 0.58) !important;
 }
 
-.shell--immersive .composer .el-textarea__inner:focus {
+.shell--immersive.theme--dark .composer .el-textarea__inner:focus {
   box-shadow:
     0 0 0 1px rgba(121, 153, 255, 0.38),
     0 0 22px rgba(74, 116, 255, 0.12) !important;
 }
 
-.shell--immersive .message-row--user .message-bubble {
+.shell--immersive.theme--dark .message-row--user .message-bubble {
   background: linear-gradient(180deg, rgba(74, 116, 255, 0.9), rgba(45, 83, 210, 0.92)) !important;
 }
 
-.shell--immersive .ai-box__actions .ai-action-btn {
+.shell--immersive.theme--dark .ai-box__actions .ai-action-btn {
   color: #eef4ff !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.shell--immersive .ai-box__actions .ai-action-btn--report {
+.shell--immersive.theme--dark .ai-box__actions .ai-action-btn--report {
   background: linear-gradient(180deg, rgba(80, 128, 255, 0.34), rgba(25, 49, 108, 0.3)) !important;
 }
 
-.shell--immersive .ai-box__actions .ai-action-btn--batch {
+.shell--immersive.theme--dark .ai-box__actions .ai-action-btn--batch {
   background: linear-gradient(180deg, rgba(61, 201, 221, 0.3), rgba(18, 73, 87, 0.28)) !important;
 }
 
-.shell--immersive .filter-action .ai-action-btn--query {
+.shell--immersive.theme--dark .filter-action .ai-action-btn--query {
   color: #eef4ff !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   background: linear-gradient(180deg, rgba(79, 132, 255, 0.34), rgba(23, 48, 109, 0.3)) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.shell--immersive .ai-box__actions .ai-action-btn:hover {
+.shell--immersive.theme--dark .ai-box__actions .ai-action-btn:hover {
   border-color: rgba(139, 172, 255, 0.28) !important;
   box-shadow:
     0 18px 36px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-.shell--immersive .filter-action .ai-action-btn--query:hover {
+.shell--immersive.theme--dark .filter-action .ai-action-btn--query:hover {
   border-color: rgba(139, 172, 255, 0.28) !important;
   box-shadow:
     0 18px 36px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-.shell--immersive .console-action-btn {
+.shell--immersive.theme--dark .console-action-btn {
   color: #eef4ff !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
-.shell--immersive .console-action-btn--simulate {
+.shell--immersive.theme--dark .console-action-btn--simulate {
   background: linear-gradient(180deg, rgba(76, 124, 255, 0.36), rgba(26, 46, 103, 0.3)) !important;
 }
 
-.shell--immersive .console-action-btn--train {
+.shell--immersive.theme--dark .console-action-btn--train {
   background: linear-gradient(180deg, rgba(67, 162, 255, 0.34), rgba(19, 57, 107, 0.28)) !important;
 }
 
-.shell--immersive .console-action-btn--detect {
+.shell--immersive.theme--dark .console-action-btn--detect {
   background: linear-gradient(180deg, rgba(64, 211, 230, 0.3), rgba(17, 75, 91, 0.28)) !important;
 }
 
-.shell--immersive .console-action-btn--collect {
+.shell--immersive.theme--dark .console-action-btn--collect {
   background: linear-gradient(180deg, rgba(75, 190, 255, 0.3), rgba(18, 68, 100, 0.28)) !important;
 }
 
-.shell--immersive .console-action-btn--import {
+.shell--immersive.theme--dark .console-action-btn--import {
   background: linear-gradient(180deg, rgba(82, 133, 255, 0.18), rgba(24, 50, 111, 0.16)) !important;
 }
 
-.shell--immersive .console-action-btn--partial-clean {
+.shell--immersive.theme--dark .console-action-btn--partial-clean {
   background: linear-gradient(180deg, rgba(70, 184, 255, 0.16), rgba(17, 63, 109, 0.16)) !important;
 }
 
-.shell--immersive .console-action-btn--clear-all {
+.shell--immersive.theme--dark .console-action-btn--clear-all {
   background: linear-gradient(180deg, rgba(54, 176, 205, 0.2), rgba(15, 71, 86, 0.18)) !important;
 }
 
-.shell--immersive .console-action-btn:hover {
+.shell--immersive.theme--dark .console-action-btn:hover {
   border-color: rgba(139, 172, 255, 0.28) !important;
   box-shadow:
     0 18px 36px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
-.shell--immersive .panel-card,
-.shell--immersive .portal-card,
-.shell--immersive .metric-card,
-.shell--immersive .message-bubble,
-.shell--immersive .chat-intro__prompts button,
-.shell--immersive .console-card,
-.shell--immersive .maintenance-item,
-.shell--immersive .alert-item {
+.shell--immersive.theme--dark .panel-card,
+.shell--immersive.theme--dark .portal-card,
+.shell--immersive.theme--dark .metric-card,
+.shell--immersive.theme--dark .message-bubble,
+.shell--immersive.theme--dark .chat-intro__prompts button,
+.shell--immersive.theme--dark .console-card,
+.shell--immersive.theme--dark .maintenance-item,
+.shell--immersive.theme--dark .alert-item {
   transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
 }
 
-.shell--immersive .panel-card:hover,
-.shell--immersive .portal-card:hover,
-.shell--immersive .metric-card:hover,
-.shell--immersive .chat-intro__prompts button:hover,
-.shell--immersive .console-card:hover,
-.shell--immersive .maintenance-item:hover,
-.shell--immersive .alert-item:hover {
+.shell--immersive.theme--dark .panel-card:hover,
+.shell--immersive.theme--dark .portal-card:hover,
+.shell--immersive.theme--dark .metric-card:hover,
+.shell--immersive.theme--dark .chat-intro__prompts button:hover,
+.shell--immersive.theme--dark .console-card:hover,
+.shell--immersive.theme--dark .maintenance-item:hover,
+.shell--immersive.theme--dark .alert-item:hover {
   transform: translateY(-3px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28) !important;
   border-color: rgba(130, 162, 255, 0.26) !important;

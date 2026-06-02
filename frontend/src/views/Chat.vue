@@ -459,7 +459,7 @@ onUnmounted(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-:global(.shell--immersive) .message-bubble {
+:global(.shell--immersive.theme--dark) .message-bubble {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
     linear-gradient(90deg, rgba(93, 215, 255, 0.08), transparent) !important;
@@ -467,7 +467,7 @@ onUnmounted(() => {
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
 }
 
-:global(.shell--immersive) .message-row--user .message-bubble {
+:global(.shell--immersive.theme--dark) .message-row--user .message-bubble {
   background:
     linear-gradient(135deg, rgba(22, 51, 88, 0.82), rgba(13, 73, 88, 0.64)),
     repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.06) 0, rgba(93, 215, 255, 0.06) 1px, transparent 1px, transparent 22px),
@@ -476,6 +476,16 @@ onUnmounted(() => {
   box-shadow:
     0 16px 38px rgba(0, 0, 0, 0.24),
     0 0 26px rgba(93, 215, 255, 0.08) !important;
+}
+
+:global(.shell--immersive.theme--light) .message-row--user :is(.message-bubble__role, .message-bubble__text) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+}
+
+:global(.shell--immersive.theme--dark) .composer .el-textarea__inner {
+  -webkit-text-fill-color: currentColor;
 }
 
 @media (max-width: 1080px) {

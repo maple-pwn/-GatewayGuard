@@ -441,6 +441,7 @@ import {
 import { anomalyApi, llmApi, systemApi } from '../api/index.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { buildEventChartData } from '../utils/eventCharts.js'
+import { isDarkScheme } from '../utils/colorScheme.js'
 
 use([
   CanvasRenderer,
@@ -466,6 +467,7 @@ const showReport = ref(false)
 const reportResult = ref(null)
 
 const isImmersive = computed(() => route.meta.shell === 'immersive')
+const useDarkCharts = computed(() => isImmersive.value && isDarkScheme.value)
 const chartData = ref(buildEventChartData([]))
 const highRiskCount = ref(0)
 const openCount = ref(0)
@@ -498,12 +500,25 @@ function riskLabel(level) {
   return { critical: '严重', high: '高危', medium: '中危', low: '低危' }[level] || level
 }
 
-const chartTextColor = computed(() => (isImmersive.value ? '#dce8fb' : '#51647f'))
-const chartSplitColor = computed(() => (isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7'))
+const chartTextColor = computed(() => (useDarkCharts.value ? '#dce8fb' : '#51647f'))
+const chartSplitColor = computed(() => (useDarkCharts.value ? 'rgba(255,255,255,0.08)' : '#edf2f7'))
+const severityPalette = computed(() => (
+  useDarkCharts.value
+    ? ['#9d3048', '#a24f2d', '#9d7320', '#247d70']
+    : ['#ff6f84', '#f5a05f', '#f2c35d', '#46b89a']
+))
+const barGradient = computed(() => ({
+  protocol: useDarkCharts.value
+    ? ['#5dd7ff', '#3159b8']
+    : ['#58b8ff', '#2f68d8'],
+  type: useDarkCharts.value
+    ? ['#247d70', '#5dd7ff']
+    : ['#46b89a', '#58b8ff'],
+}))
 const chartTooltipStyle = computed(() => ({
-  backgroundColor: isImmersive.value ? 'rgba(7, 15, 27, 0.94)' : 'rgba(255, 255, 255, 0.96)',
-  borderColor: isImmersive.value ? 'rgba(93, 215, 255, 0.24)' : 'rgba(62, 103, 255, 0.18)',
-  textStyle: { color: isImmersive.value ? '#edf6ff' : '#162130' },
+  backgroundColor: useDarkCharts.value ? 'rgba(7, 15, 27, 0.94)' : 'rgba(255, 255, 255, 0.96)',
+  borderColor: useDarkCharts.value ? 'rgba(93, 215, 255, 0.24)' : 'rgba(62, 103, 255, 0.18)',
+  textStyle: { color: useDarkCharts.value ? '#edf6ff' : '#162130' },
   extraCssText: 'border-radius: 12px; box-shadow: 0 18px 38px rgba(0,0,0,0.22); backdrop-filter: blur(12px);',
 }))
 const trendWindowLabel = computed(() => (
@@ -528,7 +543,7 @@ const riskGaugeOption = computed(() => ({
       axisLine: {
         lineStyle: {
           width: 12,
-          color: [[1, isImmersive.value ? 'rgba(255,255,255,0.08)' : '#e7edf6']],
+          color: [[1, useDarkCharts.value ? 'rgba(255,255,255,0.08)' : '#e7edf6']],
         },
       },
       axisTick: { show: false },
@@ -539,7 +554,7 @@ const riskGaugeOption = computed(() => ({
       detail: {
         valueAnimation: true,
         formatter: '{value}',
-        color: isImmersive.value ? '#f5f9ff' : '#1f2d3d',
+        color: useDarkCharts.value ? '#f5f9ff' : '#1f2d3d',
         fontSize: 30,
         fontWeight: 800,
         offsetCenter: [0, '-2%'],
@@ -582,9 +597,9 @@ const trendOption = computed(() => ({
       type: 'line',
       smooth: true,
       symbolSize: 7,
-      areaStyle: { color: isImmersive.value ? 'rgba(86, 184, 255, 0.2)' : 'rgba(61, 103, 255, 0.12)' },
-      lineStyle: { width: 3, color: '#5dd7ff' },
-      itemStyle: { color: '#5dd7ff' },
+      areaStyle: { color: useDarkCharts.value ? 'rgba(86, 184, 255, 0.2)' : 'rgba(61, 103, 255, 0.12)' },
+      lineStyle: { width: 3, color: useDarkCharts.value ? '#5dd7ff' : '#2f68d8' },
+      itemStyle: { color: useDarkCharts.value ? '#5dd7ff' : '#2f68d8' },
       data: chartData.value.trend.map((item) => item.total),
     },
     {
@@ -592,9 +607,9 @@ const trendOption = computed(() => ({
       type: 'line',
       smooth: true,
       symbolSize: 7,
-      areaStyle: { color: 'rgba(193, 69, 95, 0.08)' },
-      lineStyle: { width: 3, color: '#c1455f' },
-      itemStyle: { color: '#c1455f' },
+      areaStyle: { color: useDarkCharts.value ? 'rgba(193, 69, 95, 0.08)' : 'rgba(255, 111, 132, 0.14)' },
+      lineStyle: { width: 3, color: useDarkCharts.value ? '#c1455f' : '#ff6f84' },
+      itemStyle: { color: useDarkCharts.value ? '#c1455f' : '#ff6f84' },
       data: chartData.value.trend.map((item) => item.highRisk),
     },
   ],
@@ -607,7 +622,7 @@ const severityPieOption = computed(() => ({
     bottom: 0,
     textStyle: { color: chartTextColor.value },
   },
-  color: ['#9d3048', '#a24f2d', '#9d7320', '#247d70'],
+  color: severityPalette.value,
   series: [
     {
       type: 'pie',
@@ -616,7 +631,7 @@ const severityPieOption = computed(() => ({
       avoidLabelOverlap: true,
       label: { color: chartTextColor.value, formatter: '{b}: {c}' },
       itemStyle: {
-        borderColor: isImmersive.value ? 'rgba(5, 12, 22, 0.85)' : '#ffffff',
+        borderColor: useDarkCharts.value ? 'rgba(5, 12, 22, 0.85)' : '#ffffff',
         borderWidth: 2,
       },
       data: chartData.value.severity,
@@ -654,8 +669,8 @@ const protocolBarOption = computed(() => ({
           x2: 0,
           y2: 1,
           colorStops: [
-            { offset: 0, color: '#5dd7ff' },
-            { offset: 1, color: '#3159b8' },
+            { offset: 0, color: barGradient.value.protocol[0] },
+            { offset: 1, color: barGradient.value.protocol[1] },
           ],
         },
       },
@@ -693,8 +708,8 @@ const typeBarOption = computed(() => ({
           x2: 1,
           y2: 0,
           colorStops: [
-            { offset: 0, color: '#247d70' },
-            { offset: 1, color: '#5dd7ff' },
+            { offset: 0, color: barGradient.value.type[0] },
+            { offset: 1, color: barGradient.value.type[1] },
           ],
         },
       },
@@ -956,11 +971,30 @@ onMounted(loadPageData)
     repeating-linear-gradient(90deg, rgba(61, 103, 255, 0.035) 0, rgba(61, 103, 255, 0.035) 1px, transparent 1px, transparent 28px);
 }
 
-:global(.shell--immersive) .chart-card {
+:global(.shell--immersive.theme--dark) .chart-card {
   border-color: rgba(93, 215, 255, 0.14) !important;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04)),
     repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.045) 0, rgba(93, 215, 255, 0.045) 1px, transparent 1px, transparent 28px) !important;
+}
+
+:global(.shell--immersive.theme--dark) .events-page :is(
+  .situation-card,
+  .situation-card *,
+  .events-grid,
+  .events-grid *,
+  .filter-grid,
+  .filter-grid *,
+  .event-detail,
+  .event-detail *,
+  .report-panel,
+  .report-panel *,
+  .report-hero,
+  .report-hero *,
+  .report-conclusion,
+  .report-conclusion *
+) {
+  -webkit-text-fill-color: currentColor;
 }
 
 .situation-card__head {
@@ -1033,12 +1067,12 @@ onMounted(loadPageData)
   font-weight: 900;
 }
 
-:global(.shell--immersive) .triage-item strong {
+:global(.shell--immersive.theme--dark) .triage-item strong {
   color: #ffffff;
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.32);
 }
 
-:global(.shell--immersive) .triage-item span {
+:global(.shell--immersive.theme--dark) .triage-item span {
   color: rgba(204, 224, 252, 0.82);
 }
 
@@ -1051,7 +1085,7 @@ onMounted(loadPageData)
   color: #ff405c;
 }
 
-:global(.shell--immersive) .triage-item--critical strong {
+:global(.shell--immersive.theme--dark) .triage-item--critical strong {
   color: #ff6f84;
   text-shadow: 0 0 18px rgba(255, 74, 104, 0.42);
 }
@@ -1065,7 +1099,7 @@ onMounted(loadPageData)
   color: #c77900;
 }
 
-:global(.shell--immersive) .triage-item--open strong {
+:global(.shell--immersive.theme--dark) .triage-item--open strong {
   color: #ffd36e;
   text-shadow: 0 0 18px rgba(255, 199, 84, 0.38);
 }
@@ -1079,9 +1113,26 @@ onMounted(loadPageData)
   color: #008f82;
 }
 
-:global(.shell--immersive) .triage-item--ai strong {
+:global(.shell--immersive.theme--dark) .triage-item--ai strong {
   color: #55f1df;
   text-shadow: 0 0 18px rgba(85, 241, 223, 0.36);
+}
+
+:global(.shell--immersive.theme--light) .situation-card__eyebrow,
+:global(.shell--immersive.theme--light) .events-filter__eyebrow,
+:global(.shell--immersive.theme--light) .ai-box__eyebrow {
+  color: #2f68d8 !important;
+}
+
+:global(.shell--immersive.theme--light) .situation-card__title,
+:global(.shell--immersive.theme--light) .panel-header__title {
+  color: #10233d !important;
+}
+
+:global(.shell--immersive.theme--light) .situation-card__meta,
+:global(.shell--immersive.theme--light) .situation-hint,
+:global(.shell--immersive.theme--light) .filter-field label {
+  color: #51647f !important;
 }
 
 .panel-header__title {
@@ -1167,6 +1218,20 @@ onMounted(loadPageData)
     0 16px 34px rgba(92, 16, 34, 0.28) !important;
 }
 
+:global(.shell--immersive.theme--light) .filter-action :deep(.ai-action-btn--clear) {
+  --el-button-bg-color: rgba(255, 247, 250, 0.96);
+  --el-button-border-color: rgba(210, 62, 83, 0.26);
+  --el-button-text-color: #b4233f;
+  --el-button-hover-bg-color: rgba(255, 238, 243, 0.98);
+  --el-button-hover-border-color: rgba(194, 37, 67, 0.36);
+  --el-button-hover-text-color: #9f1d35;
+  --el-button-active-bg-color: rgba(255, 228, 235, 0.98);
+  color: #b4233f !important;
+  border-color: rgba(210, 62, 83, 0.26) !important;
+  background: linear-gradient(180deg, rgba(255, 247, 250, 0.96), rgba(255, 232, 238, 0.88)) !important;
+  box-shadow: 0 10px 22px rgba(194, 37, 67, 0.08) !important;
+}
+
 .severity-chip {
   --el-tag-border-color: rgba(128, 150, 180, 0.28);
   --el-tag-bg-color: rgba(128, 150, 180, 0.1);
@@ -1203,28 +1268,61 @@ onMounted(loadPageData)
   --el-tag-text-color: #247d70;
 }
 
-:global(.shell--immersive) .severity-chip--critical {
+:global(.shell--immersive.theme--dark) .severity-chip--critical {
   --el-tag-border-color: rgba(194, 69, 92, 0.48);
   --el-tag-bg-color: rgba(94, 20, 35, 0.32);
   --el-tag-text-color: #f0a7b4;
 }
 
-:global(.shell--immersive) .severity-chip--high {
+:global(.shell--immersive.theme--dark) .severity-chip--high {
   --el-tag-border-color: rgba(203, 104, 58, 0.46);
   --el-tag-bg-color: rgba(104, 45, 23, 0.28);
   --el-tag-text-color: #f0ba91;
 }
 
-:global(.shell--immersive) .severity-chip--medium {
+:global(.shell--immersive.theme--dark) .severity-chip--medium {
   --el-tag-border-color: rgba(213, 164, 61, 0.42);
   --el-tag-bg-color: rgba(105, 78, 22, 0.26);
   --el-tag-text-color: #f1d28b;
 }
 
-:global(.shell--immersive) .severity-chip--low {
+:global(.shell--immersive.theme--dark) .severity-chip--low {
   --el-tag-border-color: rgba(78, 185, 165, 0.38);
   --el-tag-bg-color: rgba(32, 112, 98, 0.24);
   --el-tag-text-color: #9ee5d7;
+}
+
+:global(.shell--immersive.theme--light) .severity-chip--critical {
+  --el-tag-border-color: rgba(255, 111, 132, 0.34);
+  --el-tag-bg-color: rgba(255, 111, 132, 0.13);
+  --el-tag-text-color: #c22543;
+}
+
+:global(.shell--immersive.theme--light) .severity-chip--high {
+  --el-tag-border-color: rgba(245, 160, 95, 0.36);
+  --el-tag-bg-color: rgba(245, 160, 95, 0.14);
+  --el-tag-text-color: #b45c1c;
+}
+
+:global(.shell--immersive.theme--light) .severity-chip--medium {
+  --el-tag-border-color: rgba(242, 195, 93, 0.4);
+  --el-tag-bg-color: rgba(242, 195, 93, 0.16);
+  --el-tag-text-color: #9a6a11;
+}
+
+:global(.shell--immersive.theme--light) .severity-chip--low {
+  --el-tag-border-color: rgba(70, 184, 154, 0.34);
+  --el-tag-bg-color: rgba(70, 184, 154, 0.13);
+  --el-tag-text-color: #107765;
+}
+
+:global(.shell--immersive.theme--light) .table-card :deep(.el-table__body td.el-table__cell) {
+  color: #10233d !important;
+}
+
+:global(.shell--immersive.theme--light) .table-card :deep(.el-table__body td.el-table__cell .cell) {
+  color: #10233d !important;
+  -webkit-text-fill-color: currentColor;
 }
 
 .table-ai-btn {
@@ -1241,7 +1339,7 @@ onMounted(loadPageData)
   letter-spacing: 0.04em;
 }
 
-:global(.shell--immersive) .table-ai-btn {
+:global(.shell--immersive.theme--dark) .table-ai-btn {
   --el-button-bg-color: rgba(75, 118, 255, 0.12);
   --el-button-border-color: rgba(118, 166, 255, 0.28);
   --el-button-text-color: #bcd3ff;
@@ -1358,6 +1456,52 @@ onMounted(loadPageData)
   --report-blue: #2f68ff;
   --report-amber: #d28a18;
   --report-red: #d94b65;
+}
+
+:global(.ai-report-dialog, .ai-report-dialog *) {
+  -webkit-text-fill-color: currentColor;
+}
+
+:global(html.theme--dark .ai-report-dialog) {
+  --gg-text: #f8fbff;
+  --gg-text-soft: #d9e8ff;
+  --gg-text-strong: #ffffff;
+  --report-panel-bg: rgba(8, 26, 51, 0.98);
+  --report-panel-line: rgba(135, 190, 255, 0.24);
+  --report-cyan: #55f1df;
+  --report-blue: #9eeafa;
+  --report-amber: #ffd36e;
+  --report-red: #ff6f84;
+  color: #f8fbff;
+}
+
+:global(html.theme--dark .ai-report-dialog.el-dialog) {
+  background: linear-gradient(135deg, #071a33 0%, #06101d 48%, #0b0f14 100%) !important;
+  border: 1px solid rgba(135, 190, 255, 0.22);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.58);
+}
+
+:global(html.theme--dark .ai-report-dialog .el-dialog__title),
+:global(html.theme--dark .ai-report-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: #ffffff;
+}
+
+:global(html.theme--dark .ai-report-dialog .el-dialog__body),
+:global(html.theme--dark .ai-report-dialog .dialog-loading),
+:global(html.theme--dark .ai-report-dialog .raw-block) {
+  color: #f8fbff;
+}
+
+:global(html.theme--dark .ai-report-dialog .el-dialog__body),
+:global(html.theme--dark .ai-report-dialog) .ai-report {
+  background: linear-gradient(135deg, rgba(7, 26, 51, 0.82) 0%, rgba(6, 16, 29, 0.92) 52%, rgba(11, 15, 20, 0.9) 100%) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog) .raw-block {
+  background: linear-gradient(135deg, #071a33 0%, #07101c 58%, #0b0f14 100%) !important;
+  color: #ffffff;
+  border: 1px solid rgba(135, 190, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 :global(.ai-report-dialog .el-dialog__body) {
@@ -1638,50 +1782,134 @@ onMounted(loadPageData)
   line-height: 1.7;
 }
 
-:global(.shell--immersive) .report-hero {
+:global(.shell--immersive.theme--dark) .report-hero {
   border-color: rgba(93, 215, 255, 0.18);
   background:
     linear-gradient(135deg, rgba(72, 123, 255, 0.18), rgba(19, 211, 188, 0.08) 48%, rgba(7, 13, 23, 0.72)),
     repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.08) 0, rgba(93, 215, 255, 0.08) 1px, transparent 1px, transparent 26px);
 }
 
-:global(.shell--immersive) .report-hero h3,
-:global(.shell--immersive) .report-panel__title,
-:global(.shell--immersive) .report-conclusion strong {
+:global(.shell--immersive.theme--dark) .report-hero h3,
+:global(.shell--immersive.theme--dark) .report-panel__title,
+:global(.shell--immersive.theme--dark) .report-conclusion strong {
   color: #edf4ff;
 }
 
-:global(.shell--immersive) .report-hero p,
-:global(.shell--immersive) .report-rec-item,
-:global(.shell--immersive) .report-timeline__item,
-:global(.shell--immersive) .report-panel .report-text-block {
+:global(.shell--immersive.theme--dark) .report-hero p,
+:global(.shell--immersive.theme--dark) .report-rec-item,
+:global(.shell--immersive.theme--dark) .report-timeline__item,
+:global(.shell--immersive.theme--dark) .report-panel .report-text-block {
   color: #dce8fb;
 }
 
-:global(.shell--immersive) .report-risk-badge,
-:global(.shell--immersive) .report-panel,
-:global(.shell--immersive) .report-timeline__item,
-:global(.shell--immersive) .report-conclusion {
+:global(.shell--immersive.theme--dark) .report-risk-badge,
+:global(.shell--immersive.theme--dark) .report-panel,
+:global(.shell--immersive.theme--dark) .report-timeline__item,
+:global(.shell--immersive.theme--dark) .report-conclusion {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(.shell--immersive) .report-risk-badge strong {
+:global(.shell--immersive.theme--dark) .report-risk-badge strong {
   text-shadow: 0 0 18px rgba(93, 215, 255, 0.3);
 }
 
-:global(.shell--immersive) .report-rec-item__index {
+:global(.shell--immersive.theme--dark) .report-rec-item__index {
   color: #55f1df;
   background: rgba(85, 241, 223, 0.1);
   border-color: rgba(85, 241, 223, 0.18);
 }
 
-:global(.shell--immersive) .report-conclusion span,
-:global(.shell--immersive) .report-risk-badge span {
+:global(.shell--immersive.theme--dark) .report-conclusion span,
+:global(.shell--immersive.theme--dark) .report-risk-badge span {
   color: rgba(204, 224, 252, 0.72);
 }
 
-:global(.shell--immersive) .analysis-scope-chip {
+:global(.shell--immersive.theme--dark) .analysis-scope-chip {
+  color: #9eeafa;
+  border-color: rgba(94, 215, 255, 0.26);
+  background: rgba(62, 178, 220, 0.12);
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-hero {
+  border-color: rgba(93, 215, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(72, 123, 255, 0.2), rgba(19, 211, 188, 0.1) 48%, rgba(4, 10, 19, 0.98)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.08) 0, rgba(93, 215, 255, 0.08) 1px, transparent 1px, transparent 26px) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog .report-hero) {
+  border-color: rgba(93, 215, 255, 0.18);
+  background:
+    linear-gradient(135deg, rgba(72, 123, 255, 0.2), rgba(19, 211, 188, 0.1) 48%, rgba(4, 10, 19, 0.98)),
+    repeating-linear-gradient(90deg, rgba(93, 215, 255, 0.08) 0, rgba(93, 215, 255, 0.08) 1px, transparent 1px, transparent 26px) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-hero h3,
+:global(html.theme--dark .ai-report-dialog) .report-panel__title,
+:global(html.theme--dark .ai-report-dialog) .report-conclusion strong {
+  color: #ffffff;
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-hero p,
+:global(html.theme--dark .ai-report-dialog) .report-rec-item,
+:global(html.theme--dark .ai-report-dialog) .report-timeline__item,
+:global(html.theme--dark .ai-report-dialog) .report-panel .report-text-block {
+  color: #f8fbff;
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-risk-badge,
+:global(html.theme--dark .ai-report-dialog) .report-panel,
+:global(html.theme--dark .ai-report-dialog) .report-timeline__item,
+:global(html.theme--dark .ai-report-dialog) .report-conclusion {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24);
+}
+
+:global(html.theme--dark .ai-report-dialog .report-risk-badge,
+html.theme--dark .ai-report-dialog .report-panel,
+html.theme--dark .ai-report-dialog .report-timeline__item,
+html.theme--dark .ai-report-dialog .report-conclusion) {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog .report-risk-badge) {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog .report-panel) {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog .report-timeline__item) {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog .report-conclusion) {
+  background: linear-gradient(135deg, rgba(8, 26, 51, 0.98), rgba(7, 14, 26, 0.98) 56%, rgba(11, 15, 20, 0.98)) !important;
+  border-color: rgba(135, 190, 255, 0.24) !important;
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-risk-badge strong {
+  text-shadow: 0 0 18px rgba(93, 215, 255, 0.3);
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-rec-item__index {
+  color: #55f1df;
+  background: rgba(85, 241, 223, 0.1);
+  border-color: rgba(85, 241, 223, 0.18);
+}
+
+:global(html.theme--dark .ai-report-dialog) .report-conclusion span,
+:global(html.theme--dark .ai-report-dialog) .report-risk-badge span {
+  color: rgba(204, 224, 252, 0.72);
+}
+
+:global(html.theme--dark .ai-report-dialog) .analysis-scope-chip {
   color: #9eeafa;
   border-color: rgba(94, 215, 255, 0.26);
   background: rgba(62, 178, 220, 0.12);

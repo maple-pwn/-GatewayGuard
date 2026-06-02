@@ -327,11 +327,13 @@ import { BarChart, ScatterChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { systemApi } from '../api/index.js'
+import { isDarkScheme } from '../utils/colorScheme.js'
 
 use([CanvasRenderer, BarChart, ScatterChart, GridComponent, TooltipComponent, LegendComponent])
 
 const route = useRoute()
 const isImmersive = computed(() => route.meta.shell === 'immersive')
+const useDarkCharts = computed(() => isImmersive.value && isDarkScheme.value)
 const status = ref(null)
 const loading = ref(false)
 const activeSlide = ref(0)
@@ -424,15 +426,15 @@ const f1ChartOption = computed(() => ({
   xAxis: {
     type: 'category',
     data: f1Cases.map(([name]) => name),
-    axisLabel: { interval: 0, rotate: 28, color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    axisLine: { lineStyle: { color: isImmersive.value ? 'rgba(255,255,255,0.16)' : '#d7e1ee' } },
+    axisLabel: { interval: 0, rotate: 28, color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    axisLine: { lineStyle: { color: useDarkCharts.value ? 'rgba(255,255,255,0.16)' : '#b8c8dc' } },
   },
   yAxis: {
     type: 'value',
     min: 0.8,
     max: 1.02,
-    axisLabel: { color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    splitLine: { lineStyle: { color: isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7' } },
+    axisLabel: { color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    splitLine: { lineStyle: { color: useDarkCharts.value ? 'rgba(255,255,255,0.08)' : '#d9e5f5' } },
   },
   series: [
     {
@@ -461,18 +463,18 @@ const prScatterOption = computed(() => ({
     min: 0.8,
     max: 1.02,
     name: 'Recall',
-    nameTextStyle: { color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    axisLabel: { color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    splitLine: { lineStyle: { color: isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7' } },
+    nameTextStyle: { color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    axisLabel: { color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    splitLine: { lineStyle: { color: useDarkCharts.value ? 'rgba(255,255,255,0.08)' : '#d9e5f5' } },
   },
   yAxis: {
     type: 'value',
     min: 0.8,
     max: 1.02,
     name: 'Precision',
-    nameTextStyle: { color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    axisLabel: { color: isImmersive.value ? '#c5d6f5' : '#60748f' },
-    splitLine: { lineStyle: { color: isImmersive.value ? 'rgba(255,255,255,0.08)' : '#edf2f7' } },
+    nameTextStyle: { color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    axisLabel: { color: useDarkCharts.value ? '#c5d6f5' : '#334b68' },
+    splitLine: { lineStyle: { color: useDarkCharts.value ? 'rgba(255,255,255,0.08)' : '#d9e5f5' } },
   },
   series: [
     {
@@ -480,9 +482,9 @@ const prScatterOption = computed(() => ({
       data: prCases.map(([name, recall, precision, size]) => [recall, precision, size, name]),
       symbolSize: (value) => Math.max(12, Math.min(30, value[2] / 1800)),
       itemStyle: {
-        color: isImmersive.value ? '#72a9ff' : '#3d67ff',
-        shadowBlur: isImmersive.value ? 18 : 0,
-        shadowColor: isImmersive.value ? 'rgba(114,169,255,0.28)' : 'transparent',
+        color: useDarkCharts.value ? '#72a9ff' : '#2f68d8',
+        shadowBlur: useDarkCharts.value ? 18 : 6,
+        shadowColor: useDarkCharts.value ? 'rgba(114,169,255,0.28)' : 'rgba(47,104,216,0.18)',
       },
     },
   ],
@@ -767,6 +769,13 @@ onUnmounted(stopAutoplay)
   padding-bottom: 18px;
 }
 
+.about-page--immersive .hero-stats .metric-card {
+  display: grid;
+  place-content: center;
+  min-height: 204px;
+  text-align: center;
+}
+
 .about-page .hero-stats .metric-card__label {
   text-align: center;
   color: #4f8ed3;
@@ -945,6 +954,167 @@ onUnmounted(stopAutoplay)
 
 .about-page--immersive .compare-row span {
   color: rgba(206, 223, 247, 0.82);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive {
+  color: #10233d;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(
+  button,
+  button *,
+  a,
+  a *,
+  div,
+  div *,
+  span,
+  strong,
+  p,
+  li,
+  label,
+  small
+) {
+  color: #10233d !important;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(
+  button,
+  h3,
+  h4,
+  p,
+  span,
+  strong,
+  .carousel-arrow,
+  .carousel-arrow *
+) {
+  color: #10233d;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(
+  .about-eyebrow,
+  h3,
+  p,
+  .hero-tags span,
+  .metric-card__label,
+  .metric-card__meta,
+  .section-head__title,
+  .section-head__desc,
+  .advantage-card__kicker,
+  .advantage-card h4,
+  .advantage-card p,
+  .innovation-card h4,
+  .innovation-card p,
+  .chart-card__title,
+  .chart-card__desc,
+  .about-head__title,
+  .status-item span,
+  .status-item strong,
+  .compare-row strong,
+  .compare-row span
+) {
+  -webkit-text-fill-color: currentColor;
+  text-shadow: none;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .about-hero__copy {
+  background:
+    radial-gradient(320px 180px at 100% 0%, rgba(61, 103, 255, 0.1), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(235, 244, 255, 0.86));
+  border-color: rgba(92, 125, 174, 0.24);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-stage,
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-panel {
+  background: transparent;
+  box-shadow: none;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-panel :is(.panel-card, .portal-card, .metric-card) {
+  box-shadow: 0 10px 28px rgba(31, 58, 104, 0.055) !important;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(h3, .advantage-card h4, .innovation-card h4, .chart-card__title, .about-head__title) {
+  color: #10233d;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(.about-hero p, .metric-card__meta, .chart-card__desc, .section-head__desc, .advantage-card p, .innovation-card p) {
+  color: #51647f;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive :is(.about-eyebrow, .metric-card__label, .advantage-card__kicker, .compare-row--head) {
+  color: #1e64b7;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .hero-tags span {
+  color: #1f4c86;
+  background: rgba(231, 240, 255, 0.78);
+  border-color: rgba(92, 125, 174, 0.24);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-arrow {
+  color: #10233d;
+  -webkit-text-fill-color: currentColor;
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(92, 125, 174, 0.28);
+  text-shadow: none;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-arrow:hover {
+  background: rgba(232, 241, 255, 0.94);
+  border-color: rgba(47, 104, 216, 0.36);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-dot {
+  background: rgba(92, 125, 174, 0.34);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .carousel-dot.active {
+  background: #2f68d8;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .metric-card__value {
+  background: linear-gradient(180deg, #103d73 0%, #2f74de 56%, #0f9c86 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .innovation-card__index {
+  color: #ffffff !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none;
+  background: linear-gradient(180deg, #4d86ff, #2459d8);
+  box-shadow: 0 10px 24px rgba(44, 93, 214, 0.18);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .status-item {
+  border-color: rgba(92, 125, 174, 0.22);
+  background: rgba(239, 246, 255, 0.82);
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .status-item span {
+  color: #51647f;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .status-item strong {
+  color: #10233d;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .compare-row {
+  border-color: rgba(92, 125, 174, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(236, 245, 255, 0.72));
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .compare-row strong {
+  color: #10233d;
+}
+
+:global(.shell--immersive.theme--light) .about-page--immersive .compare-row span {
+  color: #51647f;
 }
 
 @media (max-width: 1280px) {

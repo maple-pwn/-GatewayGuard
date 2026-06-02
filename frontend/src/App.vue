@@ -12,7 +12,10 @@
       v-else
       key="immersive"
       class="shell shell--immersive"
-      :class="{ 'shell--critical-alert': criticalFrameActive }"
+      :class="[
+        themeClass,
+        { 'shell--critical-alert': criticalFrameActive },
+      ]"
     >
       <div class="immersive-backdrop" />
       <div class="immersive-veil" />
@@ -41,6 +44,16 @@
             <span>{{ item.label }}</span>
           </button>
         </nav>
+
+        <button
+          type="button"
+          class="theme-toggle"
+          :aria-label="themeToggleLabel"
+          @click="toggleTheme"
+        >
+          <span class="theme-toggle__k">{{ colorScheme === 'light' ? 'DAY' : 'NIGHT' }}</span>
+          <strong>{{ colorScheme === 'light' ? '日间' : '夜间' }}</strong>
+        </button>
 
         <div class="immersive-topbar__clock" aria-label="本地时间">
           <div class="immersive-topbar__clock-inner">
@@ -107,6 +120,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElNotification } from 'element-plus'
 import { ChatDotRound, Cpu, House, InfoFilled, WarningFilled } from '@element-plus/icons-vue'
 import { anomalyApi, trafficApi } from './api/index.js'
+import { colorScheme, toggleColorScheme } from './utils/colorScheme.js'
 import brandIcon from './assets/icon.png'
 
 const route = useRoute()
@@ -199,6 +213,10 @@ const riskLevelTone = computed(() => ({
   low: 'low',
   none: 'none',
 }[riskLevel.value] || 'none'))
+const themeToggleLabel = computed(() => (
+  colorScheme.value === 'light' ? '切换到夜间模式' : '切换到日间模式'
+))
+const themeClass = computed(() => `theme--${colorScheme.value}`)
 
 function pickHighestSeverity(items) {
   const order = ['critical', 'high', 'medium', 'low']
@@ -233,6 +251,10 @@ function sectionPath(section, mode = currentShell.value) {
 
 function goToSection(section) {
   router.push(sectionPath(section))
+}
+
+function toggleTheme() {
+  toggleColorScheme()
 }
 
 function updateClock() {
@@ -412,6 +434,37 @@ onUnmounted(() => {
   border-color: rgba(151, 175, 255, 0.34);
 }
 
+.theme-toggle {
+  display: inline-grid;
+  align-content: center;
+  justify-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(93, 215, 255, 0.18);
+  border-radius: 999px;
+  color: rgba(218, 233, 255, 0.9);
+  background:
+    linear-gradient(180deg, rgba(15, 31, 52, 0.72), rgba(7, 16, 29, 0.72)),
+    linear-gradient(90deg, rgba(93, 215, 255, 0.12), transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 26px rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+
+.theme-toggle__k {
+  color: rgba(188, 214, 248, 0.58);
+  font-size: 10px;
+  font-family: var(--gg-font-ui);
+  letter-spacing: 0.2em;
+}
+
+.theme-toggle strong {
+  font-size: 15px;
+  font-family: var(--gg-font-ui);
+  letter-spacing: 0.08em;
+}
+
 .immersive-backdrop,
 .immersive-veil {
   position: fixed;
@@ -439,6 +492,48 @@ onUnmounted(() => {
   display: block;
   min-height: 100vh;
   color: #eef4ff;
+}
+
+.shell--immersive.theme--light {
+  color: var(--gg-text);
+}
+
+.shell--immersive.theme--light .immersive-backdrop {
+  background:
+    linear-gradient(120deg, rgba(248, 251, 255, 0.9), rgba(232, 240, 252, 0.76)),
+    url('./assets/home-hero.png') center / cover no-repeat;
+}
+
+.shell--immersive.theme--light .immersive-veil {
+  background:
+    radial-gradient(680px 280px at 12% 18%, rgba(61, 103, 255, 0.12), transparent 70%),
+    radial-gradient(460px 220px at 88% 16%, rgba(21, 154, 98, 0.1), transparent 72%),
+    linear-gradient(180deg, rgba(248, 251, 255, 0.18), rgba(237, 242, 247, 0.78));
+}
+
+.shell--immersive.theme--light .immersive-nav__btn,
+.shell--immersive.theme--light .theme-toggle,
+.shell--immersive.theme--light .immersive-topbar__clock {
+  color: var(--gg-text-strong);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(103, 119, 140, 0.22);
+  box-shadow: 0 10px 26px rgba(42, 91, 180, 0.1);
+}
+
+.shell--immersive.theme--light .immersive-nav__btn:hover,
+.shell--immersive.theme--light .immersive-nav__btn.active {
+  background: rgba(238, 244, 255, 0.92);
+  border-color: rgba(61, 103, 255, 0.26);
+}
+
+.shell--immersive.theme--light .theme-toggle__k,
+.shell--immersive.theme--light .immersive-topbar__clock-label {
+  color: var(--gg-text-soft);
+}
+
+.shell--immersive.theme--light .immersive-topbar__clock strong {
+  color: var(--gg-text-strong);
+  -webkit-text-fill-color: currentColor;
 }
 
 .shell--immersive::after {
@@ -680,8 +775,13 @@ onUnmounted(() => {
   width: 104px;
   height: 104px;
   color: #fff;
+  -webkit-text-fill-color: currentColor;
   background: radial-gradient(circle at 30% 30%, #5078ff, #152746 72%);
   box-shadow: 0 0 38px rgba(80, 120, 255, 0.28);
+}
+
+.pulse-core :is(span, strong) {
+  -webkit-text-fill-color: currentColor;
 }
 
 .pulse-core span {
